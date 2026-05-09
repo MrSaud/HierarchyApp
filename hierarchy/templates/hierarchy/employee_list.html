@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Employees{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide d365-card--table-card">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>Employees</h1>
+      <p class="d365-card__subtitle">Accounts linked to an employee profile. Select a row to edit.</p>
+    </div>
+    <div class="d365-card__actions">
+      <a href="{% url 'hierarchy:signature_bulk_upload' %}" class="d365-btn">Bulk signatures</a>
+      <a href="{% url 'hierarchy:employee_create' %}" class="d365-btn d365-btn--primary">Create employee</a>
+    </div>
+  </div>
+
+  {% if not employees %}
+    <p class="d365-empty">No employees yet. <a href="{% url 'hierarchy:employee_create' %}">Create the first employee</a>.</p>
+  {% else %}
+    <div class="d365-table-wrap">
+      <table class="d365-table">
+        <thead>
+          <tr>
+            <th scope="col" class="d365-table__avatar-col"><span class="d365-visually-hidden">Employee photo</span></th>
+            <th scope="col">Name</th>
+            <th scope="col">Tenant</th>
+            <th scope="col">Username</th>
+            <th scope="col">Employee ID</th>
+            <th scope="col">Job title</th>
+            <th scope="col">Department</th>
+            <th scope="col">Status</th>
+            <th scope="col">Signatures</th>
+            <th scope="col"><span class="d365-visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in employees %}
+            <tr>
+              <td class="d365-table__avatar-cell">
+                {% if e.personal_photo %}
+                  <img src="{{ e.personal_photo.url }}" alt="" class="d365-table-avatar" width="36" height="36">
+                {% else %}
+                  <span class="d365-table-avatar-initials" aria-hidden="true">{{ e.user.get_username|slice:":2"|upper }}</span>
+                {% endif %}
+              </td>
+              <td>{{ e.user.get_full_name|default:e.user.get_username }}</td>
+              <td>{% if e.tenant %}{{ e.tenant.name }}{% else %}—{% endif %}</td>
+              <td>{{ e.user.username }}</td>
+              <td>{{ e.employee_number|default:"—" }}</td>
+              <td>{{ e.job_title|default:"—" }}</td>
+              <td>{{ e.department|default:"—" }}</td>
+              <td>{{ e.get_employment_status_display }}</td>
+              <td class="d365-table__actions">
+                <a href="{% url 'hierarchy:signature_manage' e.pk %}" class="d365-link">{{ e.signature_count }}</a>
+              </td>
+              <td class="d365-table__actions">
+                <a href="{% url 'hierarchy:employee_edit' e.pk %}" class="d365-link">Edit</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

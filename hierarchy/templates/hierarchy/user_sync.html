@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sync users{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide">
+  <h1>Sync users from API</h1>
+  <p class="d365-card__subtitle">
+    Calls <code class="d365-code">GET /api/auth/users</code> on the tenant’s API base (same host as health checks),
+    then creates or updates login accounts, assigns them to this tenant, and creates an
+    <strong>Employee</strong> profile when one is missing (default sector: Government—editable later).
+    Query params forwarded: <code class="d365-code">take</code> (default 100, max 500),
+    optional <code class="d365-code">search</code>, optional <code class="d365-code">username</code>.
+  </p>
+
+  {% if sync_tenant %}
+    <p class="d365-help"><strong>Tenant:</strong> {{ sync_tenant.name }} (<code class="d365-code">{{ sync_tenant.slug }}</code>)</p>
+  {% endif %}
+
+  {% if request_url %}
+    <p class="d365-help"><strong>Request URL:</strong> <code class="d365-code">{{ request_url }}</code></p>
+  {% endif %}
+
+  <form
+    method="post"
+    action="{% url 'hierarchy:user_sync' %}"
+    id="user-sync-form"
+    class="d365-form d365-form--stacked"
+    data-stream-url="{% url 'hierarchy:user_sync_stream' %}"
+  >
+    {% csrf_token %}
+    {% if user.is_superuser %}
+    <div class="d365-field">
+      <label class="d365-label" for="id_tenant_slug">Tenant API (slug)</label>
+      <select name="tenant_slug" id="id_tenant_slug" class="d365-select">
+        <option value="">— Use app bar scope —</option>
+        {% for t in tenant_choices %}
+          <option value="{{ t.slug }}"{% if tenant_slug_q == t.slug %} selected{% elif not tenant_slug_q and sync_tenant and sync_tenant.slug == t.slug %} selected{% endif %}>{{ t.name }} ({{ t.slug }})</option>
+        {% endfor %}
+      </select>
+      <p class="d365-help">Leave empty to use the tenant selected in the Scope control, or pick a tenant explicitly.</p>
+    </div>
+    {% endif %}
+
+    <div class="d365-field-row">
+      <div class="d365-field">
+        <label class="d365-label" for="id_search">search</label>
+        <input type="text" name="search" id="id_search" class="d365-input" value="{{ search_q }}" placeholder="Optional filter" maxlength="200" autocomplete="off">
+      </div>
+      <div class="d365-field">
+        <label class="d365-label" for="id_username">username</label>
+        <input type="text" name="username" id="id_username" class="d365-input" value="{{ username_q }}" placeholder="Optional exact username" maxlength="150" autocomplete="off">
+      </div>
+      <div class="d365-field">
+        <label class="d365-label" for="id_take">take</label>
+        <input type="number" name="take" id="id_take" class="d365-input" value="{{ take_q }}" min="1" max="500" step="1">
+      </div>
+    </div>
+
+    <div id="user-sync-progress-wrap" class="d365-upload-progress" hidden>
+      <div class="d365-upload-progress__label">
+        <span id="user-sync-progress-status">Starting…</span>
+        <span id="user-sync-progress-pct" class="d365-upload-progress__pct" aria-live="polite">0%</span>
+      </div>
+      <progress
+        id="user-sync-progress-bar"
+        class="d365-upload-progress__bar"
+        max="100"
+        value="0"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      ></progress>
+    </div>
+
+    <div class="d365-form__actions">
+      <button type="submit" class="d365-btn d365-btn--primary">Run sync</button>
+      <a href="{% url 'hierarchy:index' %}" class="d365-link d365-link--standalone">Home</a>
+    </div>
+  </form>
+
+  <div id="sync-result-root">
+    {% if last_stats %}
+    <section class="d365-form-section d365-form-section--attached" aria-labelledby="sec-sync-result">
+      <h2 class="d365-form-section__title" id="sec-sync-result">Last run</h2>
+      <ul class="d365-help">
+        <li>Remote rows parsed: {{ last_row_count }}</li>
+        <li>Users created: {{ last_stats.created }}</li>
+        <li>Users updated: {{ last_stats.updated }}</li>
+        <li>Rows skipped (no recognizable username): {{ last_stats.skipped }}</li>
+        <li>Employees linked to tenant (sync): {{ last_stats.tenant_linked }}</li>
+        <li>Employee profiles created (were missing): {{ last_stats.employees_created }}</li>
+        <li>Employee profiles updated from remote data: {{ last_stats.employees_updated }}</li>
+        <li>Manager links resolved: {{ last_stats.managers_linked }}</li>
+      </ul>
+      {% if last_stats.errors %}
+        <p class="d365-help"><strong>Errors:</strong></p>
+        <ul class="d365-help">
+          {% for err in last_stats.errors %}
+            <li>{{ err }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/user-sync-progress.js' %}" defer></script>
+{% endblock %}

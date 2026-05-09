@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Create tenant{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide">
+  <h1>Create tenant</h1>
+  <p class="d365-card__subtitle">Add a new organization. The slug is used in APIs (e.g. <code class="d365-code">POST /api/auth/users</code> with <code class="d365-code">"tenant": "&lt;slug&gt;"</code>).</p>
+
+  {% if form.non_field_errors %}
+    <div class="d365-alert d365-alert--error" role="alert">
+      {% for err in form.non_field_errors %}
+        <p>{{ err }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" action="{% url 'hierarchy:tenant_create' %}" class="d365-form d365-form--stacked" novalidate>
+    {% csrf_token %}
+    <div class="d365-field">
+      <label class="d365-label" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+      {{ form.name }}
+      {% if form.name.errors %}<span class="d365-field__error">{{ form.name.errors.0 }}</span>{% endif %}
+    </div>
+    <div class="d365-field">
+      <label class="d365-label" for="{{ form.slug.id_for_label }}">{{ form.slug.label }}</label>
+      {{ form.slug }}
+      {% if form.slug.help_text %}<p class="d365-help">{{ form.slug.help_text }}</p>{% endif %}
+      {% if form.slug.errors %}<span class="d365-field__error">{{ form.slug.errors.0 }}</span>{% endif %}
+    </div>
+    <div class="d365-field">
+      <label class="d365-label" for="{{ form.api_base_url.id_for_label }}">{{ form.api_base_url.label }}</label>
+      {{ form.api_base_url }}
+      {% if form.api_base_url.help_text %}<p class="d365-help">{{ form.api_base_url.help_text }}</p>{% endif %}
+      {% if form.api_base_url.errors %}<span class="d365-field__error">{{ form.api_base_url.errors.0 }}</span>{% endif %}
+    </div>
+    <div class="d365-field">
+      <label class="d365-label" for="{{ form.api_key.id_for_label }}">{{ form.api_key.label }}</label>
+      {{ form.api_key }}
+      {% if form.api_key.help_text %}<p class="d365-help">{{ form.api_key.help_text }}</p>{% endif %}
+      {% if form.api_key.errors %}<span class="d365-field__error">{{ form.api_key.errors.0 }}</span>{% endif %}
+    </div>
+    <div class="d365-field">
+      <label class="d365-label" for="{{ form.api_key_header.id_for_label }}">{{ form.api_key_header.label }}</label>
+      {{ form.api_key_header }}
+      {% if form.api_key_header.help_text %}<p class="d365-help">{{ form.api_key_header.help_text }}</p>{% endif %}
+      {% if form.api_key_header.errors %}<span class="d365-field__error">{{ form.api_key_header.errors.0 }}</span>{% endif %}
+    </div>
+    <div class="d365-field d365-field--checkbox">
+      <label class="d365-checkbox-label">
+        {{ form.is_active }}
+        <span>{{ form.is_active.label }}</span>
+      </label>
+      {% if form.is_active.errors %}<span class="d365-field__error">{{ form.is_active.errors.0 }}</span>{% endif %}
+    </div>
+    <div class="d365-form__actions">
+      <button type="submit" class="d365-btn d365-btn--primary">Create tenant</button>
+      <a href="{% url 'hierarchy:tenant_list' %}" class="d365-link d365-link--standalone">All tenants</a>
+      <a href="{% url 'hierarchy:index' %}" class="d365-link d365-link--standalone">Home</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

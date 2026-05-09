@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Organizational units{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide d365-card--table-card">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>Organizational units</h1>
+      {% if structure_tenant %}<p class="d365-card__subtitle">Tenant: {{ structure_tenant.name }}</p>{% endif %}
+    </div>
+    {% if structure_tenant %}
+    <div class="d365-card__actions">
+      <a href="{% url 'hierarchy:organization_overview' %}" class="d365-btn">Overview</a>
+      <a href="{% url 'hierarchy:org_unit_create' %}" class="d365-btn d365-btn--primary">New unit</a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not structure_tenant %}
+    <p class="d365-help">Choose a tenant in Scope (superuser) to manage units.</p>
+  {% elif not units %}
+    <p class="d365-empty">No units yet. <a href="{% url 'hierarchy:org_unit_create' %}">Create one</a>.</p>
+  {% else %}
+    <div class="d365-table-wrap">
+      <table class="d365-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Code</th>
+            <th>Parent</th>
+            <th>Sort</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in units %}
+            <tr>
+              <td>{{ u.name }}</td>
+              <td>{{ u.code|default:"—" }}</td>
+              <td>{% if u.parent %}{{ u.parent.name }}{% else %}—{% endif %}</td>
+              <td>{{ u.sort_order }}</td>
+              <td class="d365-table__actions"><a href="{% url 'hierarchy:org_unit_edit' u.pk %}" class="d365-link">Edit</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

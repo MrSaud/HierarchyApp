@@ -1,0 +1,48 @@
+/* Tom Select — align with Dynamics / Fluent shell */
+.ts-wrapper {
+  font-family: var(--d365-font);
+  font-size: 14px;
+}
+
+.ts-wrapper.single .ts-control {
+  border-radius: 4px;
+  border-color: var(--d365-border);
+  min-height: 36px;
+}
+
+.ts-wrapper.focus .ts-control {
+  border-color: var(--d365-brand);
+  box-shadow: 0 0 0 1px var(--d365-brand);
+}
+
+.ts-dropdown {
+  border-radius: 4px;
+  border-color: var(--d365-border);
+  box-shadow: var(--d365-shadow);
+}
+
+.ts-dropdown .option {
+  padding: 8px 10px;
+}
+
+.ts-dropdown .active {
+  background: rgba(0, 120, 212, 0.08);
+  color: var(--d365-text-primary);
+}
+
+/* Compact tenant scope in app bar */
+.d365-app-bar .ts-wrapper.single .ts-control {
+  min-height: 30px;
+  padding: 4px 28px 4px 10px;
+  font-size: 13px;
+}
+
+.d365-app-bar .ts-wrapper {
+  min-width: 140px;
+  max-width: min(280px, 42vw);
+}
+
+/* Django admin: tables & filters */
+body.dashboard #content-main .ts-wrapper.single .ts-control {
+  min-height: 32px;
+}

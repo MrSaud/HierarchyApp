@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Signatures · {{ employee.user.get_username }}{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>Signature images</h1>
+      <p class="d365-card__subtitle">{{ employee.user.get_full_name|default:employee.user.get_username }} · Up to {{ max_signatures }} images total.</p>
+    </div>
+    <a href="{% url 'hierarchy:employee_edit' employee.pk %}" class="d365-link d365-link--standalone">← Back to employee</a>
+  </div>
+
+  <section class="d365-form-section" aria-labelledby="sec-add-sig">
+    <h2 class="d365-form-section__title" id="sec-add-sig">Add images</h2>
+    <form method="post" action="{% url 'hierarchy:signature_manage' employee.pk %}" enctype="multipart/form-data" class="d365-form d365-form--stacked">
+      {% csrf_token %}
+      <div class="d365-field">
+        <label class="d365-label" for="id_signature_images">Upload files</label>
+        <p class="d365-help">PNG, JPEG, etc. Multiple selection allowed. Current count: {{ signatures|length }}.</p>
+        <input type="file" name="signature_images" id="id_signature_images" class="d365-file-input" accept="image/*" multiple>
+      </div>
+      <button type="submit" class="d365-btn d365-btn--primary">Upload</button>
+    </form>
+  </section>
+
+  <section class="d365-form-section d365-form-section--attached" aria-labelledby="sec-existing-sig">
+    <h2 class="d365-form-section__title" id="sec-existing-sig">Existing signatures</h2>
+    {% if not signatures %}
+      <p class="d365-empty">No signature images yet.</p>
+    {% else %}
+      <div class="d365-signature-manage-grid">
+        {% for row in signature_rows %}
+          {% with sig=row.signature form=row.form %}
+          <div class="d365-signature-manage-card">
+            <div class="d365-signature-tile__img">
+              <img src="{{ sig.image.url }}" alt="Signature {{ forloop.counter }}">
+            </div>
+            <form method="post" action="{% url 'hierarchy:signature_manage' employee.pk %}" class="d365-form d365-form--stacked">
+              {% csrf_token %}
+              <input type="hidden" name="update_signature" value="1">
+              <input type="hidden" name="sig_pk" value="{{ sig.pk }}">
+              <div class="d365-field">
+                <label class="d365-label" for="{{ form.label.id_for_label }}">{{ form.label.label }}</label>
+                {{ form.label }}
+                {% if form.label.errors %}<span class="d365-field__error">{{ form.label.errors.0 }}</span>{% endif %}
+              </div>
+              <div class="d365-field">
+                <label class="d365-label" for="{{ form.sort_order.id_for_label }}">{{ form.sort_order.label }}</label>
+                {{ form.sort_order }}
+                {% if form.sort_order.errors %}<span class="d365-field__error">{{ form.sort_order.errors.0 }}</span>{% endif %}
+              </div>
+              <button type="submit" class="d365-btn d365-btn--primary">Save row</button>
+            </form>
+            <form method="post" action="{% url 'hierarchy:signature_manage' employee.pk %}" class="d365-inline-form">
+              {% csrf_token %}
+              <button type="submit" name="delete_signature" value="{{ sig.pk }}" class="d365-btn d365-btn--danger">Remove image</button>
+            </form>
+          </div>
+          {% endwith %}
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

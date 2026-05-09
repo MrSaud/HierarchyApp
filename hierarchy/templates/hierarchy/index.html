@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="d365-card">
+  <h1>Welcome</h1>
+  <p>Hierarchy app — tenant-scoped employees and profiles.</p>
+  {% if user.is_authenticated %}
+  <ul class="d365-help d365-home-quicklinks">
+    <li><a href="{% url 'hierarchy:employee_photo' %}">Employee photo</a> — your picture in the app</li>
+    {% if user.is_staff %}
+    <li><a href="{% url 'hierarchy:organization_overview' %}">Organization structure</a> — units, positions, assignments</li>
+    <li><a href="{% url 'hierarchy:employee_list' %}">Employees</a> — directory table</li>
+    {% endif %}
+  </ul>
+  {% endif %}
+</div>
+{% endblock %}

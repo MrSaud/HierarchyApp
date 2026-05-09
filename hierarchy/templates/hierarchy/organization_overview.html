@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Organization structure{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>Organization structure</h1>
+      {% if structure_tenant %}
+      <p class="d365-card__subtitle">
+        Tenant: <strong>{{ structure_tenant.name }}</strong>
+        · {{ stats.units }} unit(s), {{ stats.positions }} position(s), {{ stats.assignments }} assignment(s).
+      </p>
+      {% else %}
+      <p class="d365-card__subtitle">Define departments, positions, and who holds each role.</p>
+      {% endif %}
+    </div>
+    {% if structure_tenant %}
+    <div class="d365-card__actions">
+      <a href="{% url 'hierarchy:org_unit_list' %}" class="d365-btn">Units</a>
+      <a href="{% url 'hierarchy:position_list' %}" class="d365-btn">Positions</a>
+      <a href="{% url 'hierarchy:org_unit_create' %}" class="d365-btn d365-btn--primary">New unit</a>
+      <a href="{% url 'hierarchy:position_create' %}" class="d365-btn d365-btn--primary">New position</a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not structure_tenant %}
+    <p class="d365-help">Superusers: pick <strong>Scope</strong> in the app bar. Tenant staff: structure uses your employee tenant automatically.</p>
+  {% elif not branches and not loose_positions %}
+    <p class="d365-empty">No organizational units or positions yet.
+      <a href="{% url 'hierarchy:org_unit_create' %}">Create a unit</a> or
+      <a href="{% url 'hierarchy:position_create' %}">create a position</a>.
+    </p>
+  {% else %}
+    {% if loose_positions %}
+    <section class="d365-structure-section">
+      <h2 class="d365-structure-section__title">Positions without a unit</h2>
+      <ul class="d365-structure-positions">
+        {% for p in loose_positions %}
+          <li>
+            <a href="{% url 'hierarchy:position_detail' p.pk %}">{{ p.title }}</a>
+            {% if p.code %}<span class="d365-muted">({{ p.code }})</span>{% endif %}
+            {% if not p.is_active %}<span class="d365-pill d365-pill--muted">Inactive</span>{% endif %}
+            {% with cur=p.org_current_assignments %}
+              {% if cur %}
+                <span class="d365-structure-assignees">— {% for a in cur %}<span>{{ a.employee.user.get_full_name|default:a.employee.user.username }}{% if a.is_primary %} <abbr title="Primary position">*</abbr>{% endif %}{% if not forloop.last %}, {% endif %}</span>{% endfor %}</span>
+              {% else %}
+                <span class="d365-structure-assignees d365-structure-assignees--empty">— vacant</span>
+              {% endif %}
+            {% endwith %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    {% if branches %}
+    <section class="d365-structure-section">
+      <h2 class="d365-structure-section__title">By organizational unit</h2>
+      {% for branch in branches %}
+        {% include "hierarchy/_organization_branch.html" with branch=branch %}
+      {% endfor %}
+    </section>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

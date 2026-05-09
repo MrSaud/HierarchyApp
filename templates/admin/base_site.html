@@ -1,0 +1,26 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | Tenant{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/dynamics-admin.css' %}">
+<link rel="stylesheet" href="{% static 'vendor/tom-select/tom-select.default.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/tom-select-d365.css' %}">
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="{% static 'vendor/tom-select/tom-select.complete.min.js' %}" defer></script>
+<script src="{% static 'js/searchable-selects.js' %}" defer></script>
+{% endblock %}
+
+{% block branding %}
+<div id="site-name"><a href="{% url 'admin:index' %}">Tenant · {% translate 'Administration' %}</a></div>
+{% if user.is_anonymous %}
+  {% include "admin/color_theme_toggle.html" %}
+{% endif %}
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

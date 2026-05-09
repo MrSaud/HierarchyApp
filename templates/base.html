@@ -1,0 +1,212 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Hierarchy{% endblock %} · Tenant</title>
+  <link rel="stylesheet" href="{% static 'css/dynamics-theme.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/tom-select/tom-select.default.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/tom-select-d365.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="d365-shell">
+  <div class="d365-layout">
+    <header class="d365-app-bar" role="banner">
+      <div class="d365-app-bar__start">
+        <button type="button" class="d365-nav-fab" id="d365-nav-fab" aria-controls="d365-side-nav" aria-expanded="false" aria-label="Open menu">
+          <span class="d365-nav-fab__icon" aria-hidden="true"></span>
+        </button>
+        <a class="d365-app-bar__brand" href="{% url 'hierarchy:index' %}">
+          <span class="d365-app-bar__logo" aria-hidden="true"></span>
+          <span class="d365-app-bar__titles">
+            <span class="d365-app-bar__product">Tenant</span>
+            <span class="d365-app-bar__app-name">Hierarchy</span>
+          </span>
+        </a>
+      </div>
+      <span class="d365-app-bar__env d365-app-bar__actions">
+        {% block app_bar_extra %}
+          {% if user.is_authenticated %}
+            {% if user.is_superuser %}
+            <form method="post" action="{% url 'hierarchy:tenant_switch' %}" class="d365-tenant-switch">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <label class="d365-tenant-switch__label" for="id-app-tenant-scope">Scope</label>
+              <select name="tenant" id="id-app-tenant-scope" class="d365-select d365-select--compact" aria-label="Choose tenant scope" data-no-searchable-select="1" onchange="this.form.submit()">
+                <option value="" {% if not active_tenant %}selected{% endif %}>All tenants</option>
+                {% for t in tenant_switch_choices %}
+                  <option value="{{ t.pk }}" {% if active_tenant and active_tenant.pk == t.pk %}selected{% endif %}>{{ t.name }}{% if not t.is_active %} (inactive){% endif %}</option>
+                {% endfor %}
+              </select>
+              {% if not tenant_switch_choices %}
+              <span class="d365-help d365-tenant-switch__hint" title="Tenants come from the database configured in DATABASES. If /admin lists tenants but this is empty, the app may be using a different DB (e.g. SQLite vs MySQL).">No tenants in DB</span>
+              {% endif %}
+              <noscript><button type="submit" class="d365-btn">Apply</button></noscript>
+            </form>
+            {% if active_tenant %}
+            <a href="{% url 'hierarchy:tenant_edit' active_tenant.pk %}" class="d365-link d365-link--compact">Tenant settings</a>
+            {% endif %}
+            {% endif %}
+            <a href="{% url 'hierarchy:employee_photo' %}" class="d365-app-bar__avatar" title="Employee photo" aria-label="Employee photo">
+              {% if employee_photo_url %}
+                <img src="{{ employee_photo_url }}" alt="" class="d365-app-bar__avatar-img" width="32" height="32">
+              {% else %}
+                <span class="d365-app-bar__avatar-initials">{{ avatar_initials }}</span>
+              {% endif %}
+            </a>
+            <span class="d365-app-bar__user">{{ user.get_username }}</span>
+            <a class="d365-link" href="{% url 'logout' %}">Sign out</a>
+          {% else %}
+            <a class="d365-link" href="{% url 'login' %}">Sign in</a>
+          {% endif %}
+        {% endblock %}
+      </span>
+    </header>
+
+    <div class="d365-body">
+      <div class="d365-nav-backdrop" id="d365-nav-backdrop" hidden></div>
+      <div class="d365-nav-host" id="d365-nav-host">
+        <aside class="d365-side-nav" id="d365-side-nav" aria-label="Main navigation">
+          <div class="d365-side-nav__inner">
+            {% block side_nav %}
+            <nav class="d365-side-nav__nav">
+              <ul class="d365-nav-list">
+                <li>
+                  <a href="{% url 'hierarchy:index' %}" class="d365-nav-link{% if request.resolver_match.namespace == 'hierarchy' and request.resolver_match.url_name == 'index' %} is-active{% endif %}">
+                    <span class="d365-nav-link__icon" aria-hidden="true"></span>
+                    <span class="d365-nav-link__text">Home</span>
+                  </a>
+                </li>
+                {% if user.is_authenticated %}
+                <li>
+                  <a href="{% url 'hierarchy:employee_photo' %}" class="d365-nav-link{% if request.resolver_match.url_name == 'employee_photo' %} is-active{% endif %}">
+                    <span class="d365-nav-link__icon d365-nav-link__icon--person" aria-hidden="true"></span>
+                    <span class="d365-nav-link__text">Employee photo</span>
+                  </a>
+                </li>
+                {% endif %}
+                {% if user.is_staff %}
+                {% with u=request.resolver_match.url_name %}
+                <li class="d365-nav-group">
+                  <details class="d365-nav-details{% if request.resolver_match.namespace == 'admin' or u == 'api_health_test' or u == 'api_guide' or u == 'audit_log_list' or u == 'user_sync' or u == 'organization_overview' or u == 'org_unit_list' or u == 'org_unit_create' or u == 'org_unit_edit' or u == 'position_list' or u == 'position_create' or u == 'position_detail' or u == 'position_edit' or u == 'position_assignment_delete' or u == 'employee_list' or u == 'employee_edit' or u == 'signature_manage' or u == 'signature_bulk_upload' or u == 'tenant_list' or u == 'tenant_edit' or u == 'tenant_create' or u == 'employee_create' %} d365-nav-details--highlight{% endif %}" {% if request.resolver_match.namespace == 'admin' or u == 'api_health_test' or u == 'api_guide' or u == 'audit_log_list' or u == 'user_sync' or u == 'organization_overview' or u == 'org_unit_list' or u == 'org_unit_create' or u == 'org_unit_edit' or u == 'position_list' or u == 'position_create' or u == 'position_detail' or u == 'position_edit' or u == 'position_assignment_delete' or u == 'employee_list' or u == 'employee_edit' or u == 'signature_manage' or u == 'signature_bulk_upload' or u == 'tenant_list' or u == 'tenant_edit' or u == 'tenant_create' or u == 'employee_create' %}open{% endif %}>
+                    <summary class="d365-nav-details__summary">
+                      <span class="d365-nav-details__summary-main">
+                        <span class="d365-nav-link__icon d365-nav-link__icon--gear" aria-hidden="true"></span>
+                        <span class="d365-nav-details__title">Administration</span>
+                      </span>
+                      <span class="d365-nav-details__chevron" aria-hidden="true"></span>
+                    </summary>
+                    <ul class="d365-nav-list d365-nav-list--nested">
+                      <li>
+                        <a href="{% url 'hierarchy:api_health_test' %}" class="d365-nav-link{% if u == 'api_health_test' %} is-active{% endif %}">
+                          <span class="d365-nav-link__icon d365-nav-link__icon--health" aria-hidden="true"></span>
+                          <span class="d365-nav-link__text">API health</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="{% url 'hierarchy:api_guide' %}" class="d365-nav-link{% if u == 'api_guide' %} is-active{% endif %}">
+                          <span class="d365-nav-link__icon d365-nav-link__icon--list" aria-hidden="true"></span>
+                          <span class="d365-nav-link__text">API guide</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="{% url 'hierarchy:audit_log_list' %}" class="d365-nav-link{% if u == 'audit_log_list' %} is-active{% endif %}">
+                          <span class="d365-nav-link__icon d365-nav-link__icon--list" aria-hidden="true"></span>
+                          <span class="d365-nav-link__text">Audit log</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="{% url 'hierarchy:user_sync' %}" class="d365-nav-link{% if u == 'user_sync' %} is-active{% endif %}">
+                          <span class="d365-nav-link__icon d365-nav-link__icon--sync" aria-hidden="true"></span>
+                          <span class="d365-nav-link__text">Sync users</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="{% url 'hierarchy:organization_overview' %}" class="d365-nav-link{% if u == 'organization_overview' or u == 'org_unit_list' or u == 'org_unit_create' or u == 'org_unit_edit' or u == 'position_list' or u == 'position_create' or u == 'position_detail' or u == 'position_edit' or u == 'position_assignment_delete' %} is-active{% endif %}">
+                          <span class="d365-nav-link__icon d365-nav-link__icon--structure" aria-hidden="true"></span>
+                          <span class="d365-nav-link__text">Organization</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="{% url 'hierarchy:employee_list' %}" class="d365-nav-link{% if u == 'employee_list' or u == 'employee_edit' or u == 'signature_manage' or u == 'signature_bulk_upload' %} is-active{% endif %}">
+                          <span class="d365-nav-link__icon d365-nav-link__icon--list" aria-hidden="true"></span>
+                          <span class="d365-nav-link__text">Employees</span>
+                        </a>
+                      </li>
+                      {% if user.is_superuser %}
+                      <li>
+                        <a href="{% url 'hierarchy:tenant_list' %}" class="d365-nav-link{% if u == 'tenant_list' or u == 'tenant_edit' %} is-active{% endif %}">
+                          <span class="d365-nav-link__icon d365-nav-link__icon--building" aria-hidden="true"></span>
+                          <span class="d365-nav-link__text">Tenants</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="{% url 'hierarchy:tenant_create' %}" class="d365-nav-link{% if u == 'tenant_create' %} is-active{% endif %}">
+                          <span class="d365-nav-link__icon d365-nav-link__icon--building" aria-hidden="true"></span>
+                          <span class="d365-nav-link__text">Create tenant</span>
+                        </a>
+                      </li>
+                      {% endif %}
+                      <li>
+                        <a href="{% url 'hierarchy:signature_bulk_upload' %}" class="d365-nav-link{% if u == 'signature_bulk_upload' %} is-active{% endif %}">
+                          <span class="d365-nav-link__icon d365-nav-link__icon--list" aria-hidden="true"></span>
+                          <span class="d365-nav-link__text">Bulk signatures</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="{% url 'hierarchy:employee_create' %}" class="d365-nav-link{% if u == 'employee_create' %} is-active{% endif %}">
+                          <span class="d365-nav-link__icon d365-nav-link__icon--people" aria-hidden="true"></span>
+                          <span class="d365-nav-link__text">Create employee</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="{% url 'admin:index' %}" class="d365-nav-link{% if request.resolver_match.namespace == 'admin' %} is-active{% endif %}">
+                          <span class="d365-nav-link__icon d365-nav-link__icon--gear" aria-hidden="true"></span>
+                          <span class="d365-nav-link__text">Site admin</span>
+                        </a>
+                      </li>
+                    </ul>
+                  </details>
+                </li>
+                {% endwith %}
+                {% endif %}
+                {% if not user.is_authenticated %}
+                <li>
+                  <a href="{% url 'login' %}" class="d365-nav-link{% if request.resolver_match.url_name == 'login' %} is-active{% endif %}">
+                    <span class="d365-nav-link__icon d365-nav-link__icon--person" aria-hidden="true"></span>
+                    <span class="d365-nav-link__text">Sign in</span>
+                  </a>
+                </li>
+                {% endif %}
+              </ul>
+            </nav>
+            {% endblock %}
+          </div>
+        </aside>
+      </div>
+
+      <div class="d365-content">
+        <main class="d365-main" id="main" role="main">
+          {% if messages %}
+          <div class="d365-messages" role="status">
+            {% for message in messages %}
+              <div class="d365-message d365-message--{{ message.level_tag }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% block content %}{% endblock %}
+        </main>
+
+        <footer class="d365-footer" role="contentinfo">
+          {% block footer %}Tenant · Fluent-inspired UI{% endblock %}
+        </footer>
+      </div>
+    </div>
+  </div>
+  <script src="{% static 'vendor/tom-select/tom-select.complete.min.js' %}" defer></script>
+  <script src="{% static 'js/searchable-selects.js' %}" defer></script>
+  <script src="{% static 'js/side-nav.js' %}" defer></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Employee photo{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>Employee photo</h1>
+      <p class="d365-card__subtitle">
+        {{ employee.user.get_full_name|default:employee.user.get_username }}
+        · {{ employee.user.get_username }}
+      </p>
+    </div>
+    <a href="{% url 'hierarchy:index' %}" class="d365-btn">Home</a>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="d365-form">
+    {% csrf_token %}
+    {% if employee.personal_photo %}
+      <div class="d365-photo-preview-wrap">
+        <img src="{{ employee.personal_photo.url }}" alt="Current employee photo" class="d365-photo-preview">
+      </div>
+      <p class="d365-help">Choose a file below to replace this photo, or clear it using the checkbox next to the file input.</p>
+    {% endif %}
+    <div class="d365-field">
+      <label class="d365-label" for="{{ form.personal_photo.id_for_label }}">{{ form.personal_photo.label }}</label>
+      {{ form.personal_photo }}
+      {% if form.personal_photo.errors %}<span class="d365-field__error">{{ form.personal_photo.errors.0 }}</span>{% endif %}
+    </div>
+    <div class="d365-form-actions">
+      <button type="submit" class="d365-btn d365-btn--primary">Save employee photo</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

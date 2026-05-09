@@ -1,0 +1,124 @@
+/* Dynamics 365 theme for Django admin — overrides CSS variables from admin/base.css */
+
+html[data-theme="light"],
+:root {
+  --primary: #0078d4;
+  --secondary: #005a9e;
+  --accent: #00bcf2;
+  --primary-fg: #ffffff;
+
+  --body-fg: #323130;
+  --body-bg: #f3f2f1;
+  --body-quiet-color: #605e5c;
+  --body-medium-color: #323130;
+  --body-loud-color: #201f1e;
+
+  --header-color: #ffffff;
+  --header-branding-color: #ffffff;
+  --header-bg: #0078d4;
+  --header-link-color: #ffffff;
+
+  --breadcrumbs-fg: #c8c6c4;
+  --breadcrumbs-link-fg: #ffffff;
+  --breadcrumbs-bg: #005a9e;
+
+  --link-fg: #0078d4;
+  --link-hover-color: #005a9e;
+  --link-selected-fg: #005a9e;
+
+  --hairline-color: #edebe9;
+  --border-color: #edebe9;
+
+  --darkened-bg: #faf9f8;
+  --selected-bg: #edebe9;
+  --selected-row: #deecf9;
+
+  --button-fg: #ffffff;
+  --button-bg: #0078d4;
+  --button-hover-bg: #106ebe;
+  --default-button-bg: #005a9e;
+  --default-button-hover-bg: #004578;
+
+  --font-family-primary: "Segoe UI", "Segoe UI Web (West European)", system-ui,
+    -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", sans-serif;
+}
+
+#header {
+  box-shadow: 0 1.6px 3.6px rgba(0, 0, 0, 0.13);
+}
+
+#branding h1,
+#site-name {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+#site-name a:link,
+#site-name a:visited {
+  color: var(--header-branding-color);
+}
+
+/* Dark theme: Power Platform–style blues on dark surfaces */
+html[data-theme="dark"] {
+  --primary: #0078d4;
+  --primary-fg: #ffffff;
+  --secondary: #004578;
+  --accent: #00bcf2;
+
+  --body-fg: #ffffff;
+  --body-bg: #1b1a19;
+  --body-quiet-color: #c8c6c4;
+  --body-medium-color: #edebe9;
+  --body-loud-color: #ffffff;
+
+  --header-bg: #0078d4;
+  --header-color: #ffffff;
+  --header-branding-color: #ffffff;
+  --header-link-color: #ffffff;
+
+  --breadcrumbs-fg: #a19f9d;
+  --breadcrumbs-link-fg: #ffffff;
+  --breadcrumbs-bg: #004578;
+
+  --link-fg: #62abf5;
+  --link-hover-color: #a6d8ff;
+  --link-selected-fg: #62abf5;
+
+  --hairline-color: #3b3a39;
+  --border-color: #3b3a39;
+
+  --darkened-bg: #252423;
+  --selected-bg: #323130;
+  --selected-row: #004578;
+
+  --button-bg: #0078d4;
+  --button-hover-bg: #106ebe;
+  --default-button-bg: #005a9e;
+  --default-button-hover-bg: #004578;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-theme="auto"] {
+    --primary: #0078d4;
+    --primary-fg: #ffffff;
+    --secondary: #004578;
+
+    --body-fg: #ffffff;
+    --body-bg: #1b1a19;
+
+    --header-bg: #0078d4;
+    --header-branding-color: #ffffff;
+    --header-link-color: #ffffff;
+
+    --breadcrumbs-bg: #004578;
+    --breadcrumbs-link-fg: #ffffff;
+
+    --link-fg: #62abf5;
+    --link-hover-color: #a6d8ff;
+
+    --button-bg: #0078d4;
+    --button-hover-bg: #106ebe;
+    --default-button-bg: #005a9e;
+    --default-button-hover-bg: #004578;
+  }
+}

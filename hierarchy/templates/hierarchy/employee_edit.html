@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Edit employee{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide d365-card--employee-form">
+  <h1>Edit employee</h1>
+  <p class="d365-card__subtitle">Update account details, profile, and employment data for <strong>{{ employee.user.get_username }}</strong>. 
+    <a href="{% url 'hierarchy:signature_manage' employee.pk %}" class="d365-link">Manage signature images</a>
+  </p>
+
+  {% if user_form.non_field_errors or profile_form.non_field_errors %}
+    <div class="d365-alert d365-alert--error" role="alert">
+      {% for err in user_form.non_field_errors %}
+        <p>{{ err }}</p>
+      {% endfor %}
+      {% for err in profile_form.non_field_errors %}
+        <p>{{ err }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% if assign_form.non_field_errors %}
+    <div class="d365-alert d365-alert--error" role="alert">
+      {% for err in assign_form.non_field_errors %}
+        <p>{{ err }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" action="{% url 'hierarchy:employee_edit' employee.pk %}" class="d365-form d365-form--stacked" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+
+    <section class="d365-form-section" aria-labelledby="sec-account">
+      <h2 class="d365-form-section__title" id="sec-account">Account</h2>
+      <div class="d365-field">
+        <label class="d365-label" for="{{ user_form.username.id_for_label }}">{{ user_form.username.label }}</label>
+        {{ user_form.username }}
+        <p class="d365-help">Username cannot be changed.</p>
+        {% if user_form.username.errors %}<span class="d365-field__error">{{ user_form.username.errors.0 }}</span>{% endif %}
+      </div>
+      <div class="d365-field">
+        <label class="d365-label" for="{{ user_form.email.id_for_label }}">{{ user_form.email.label }}</label>
+        {{ user_form.email }}
+        {% if user_form.email.errors %}<span class="d365-field__error">{{ user_form.email.errors.0 }}</span>{% endif %}
+      </div>
+      <div class="d365-field-row">
+        <div class="d365-field">
+          <label class="d365-label" for="{{ user_form.first_name.id_for_label }}">{{ user_form.first_name.label }}</label>
+          {{ user_form.first_name }}
+          {% if user_form.first_name.errors %}<span class="d365-field__error">{{ user_form.first_name.errors.0 }}</span>{% endif %}
+        </div>
+        <div class="d365-field">
+          <label class="d365-label" for="{{ user_form.last_name.id_for_label }}">{{ user_form.last_name.label }}</label>
+          {{ user_form.last_name }}
+          {% if user_form.last_name.errors %}<span class="d365-field__error">{{ user_form.last_name.errors.0 }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="d365-field">
+        <label class="d365-label" for="{{ user_form.new_password1.id_for_label }}">{{ user_form.new_password1.label }}</label>
+        {{ user_form.new_password1 }}
+        {% if user_form.new_password1.help_text %}<p class="d365-help">{{ user_form.new_password1.help_text }}</p>{% endif %}
+        {% if user_form.new_password1.errors %}<span class="d365-field__error">{{ user_form.new_password1.errors.0 }}</span>{% endif %}
+      </div>
+      <div class="d365-field">
+        <label class="d365-label" for="{{ user_form.new_password2.id_for_label }}">{{ user_form.new_password2.label }}</label>
+        {{ user_form.new_password2 }}
+        {% if user_form.new_password2.errors %}<span class="d365-field__error">{{ user_form.new_password2.errors.0 }}</span>{% endif %}
+      </div>
+    </section>
+
+    <section class="d365-form-section" aria-labelledby="sec-personal">
+      <h2 class="d365-form-section__title" id="sec-personal">Personal information</h2>
+      <p class="d365-form-section__hint">Full name</p>
+      <div class="d365-field-row">
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.civil_id.id_for_label }}">{{ profile_form.civil_id.label }}</label>
+          {{ profile_form.civil_id }}
+          {% if profile_form.civil_id.errors %}<span class="d365-field__error">{{ profile_form.civil_id.errors.0 }}</span>{% endif %}
+        </div>
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.date_of_birth.id_for_label }}">{{ profile_form.date_of_birth.label }}</label>
+          {{ profile_form.date_of_birth }}
+          {% if profile_form.date_of_birth.errors %}<span class="d365-field__error">{{ profile_form.date_of_birth.errors.0 }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="d365-field-row">
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.gender.id_for_label }}">{{ profile_form.gender.label }}</label>
+          {{ profile_form.gender }}
+          {% if profile_form.gender.errors %}<span class="d365-field__error">{{ profile_form.gender.errors.0 }}</span>{% endif %}
+        </div>
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.nationality.id_for_label }}">{{ profile_form.nationality.label }}</label>
+          {{ profile_form.nationality }}
+          {% if profile_form.nationality.errors %}<span class="d365-field__error">{{ profile_form.nationality.errors.0 }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="d365-field">
+        <label class="d365-label" for="{{ profile_form.marital_status.id_for_label }}">{{ profile_form.marital_status.label }}</label>
+        {{ profile_form.marital_status }}
+        {% if profile_form.marital_status.errors %}<span class="d365-field__error">{{ profile_form.marital_status.errors.0 }}</span>{% endif %}
+      </div>
+      <div class="d365-field">
+        <label class="d365-label" for="{{ profile_form.personal_photo.id_for_label }}">{{ profile_form.personal_photo.label }}</label>
+        {% if employee.personal_photo %}
+          <div class="d365-photo-preview-wrap">
+            <img src="{{ employee.personal_photo.url }}" alt="Current employee photo" class="d365-photo-preview">
+          </div>
+          <p class="d365-help">Choose a file below to replace the current employee photo, or clear using the checkbox next to the file input.</p>
+        {% endif %}
+        {{ profile_form.personal_photo }}
+        {% if profile_form.personal_photo.errors %}<span class="d365-field__error">{{ profile_form.personal_photo.errors.0 }}</span>{% endif %}
+      </div>
+    </section>
+
+    <section class="d365-form-section" aria-labelledby="sec-contact">
+      <h2 class="d365-form-section__title" id="sec-contact">Contact information</h2>
+      <div class="d365-field">
+        <label class="d365-label" for="{{ profile_form.mobile_number.id_for_label }}">{{ profile_form.mobile_number.label }}</label>
+        {{ profile_form.mobile_number }}
+        {% if profile_form.mobile_number.errors %}<span class="d365-field__error">{{ profile_form.mobile_number.errors.0 }}</span>{% endif %}
+      </div>
+      <div class="d365-field">
+        <label class="d365-label" for="{{ profile_form.home_address.id_for_label }}">{{ profile_form.home_address.label }}</label>
+        {{ profile_form.home_address }}
+        {% if profile_form.home_address.errors %}<span class="d365-field__error">{{ profile_form.home_address.errors.0 }}</span>{% endif %}
+      </div>
+      <div class="d365-field">
+        <label class="d365-label" for="{{ profile_form.emergency_contact.id_for_label }}">{{ profile_form.emergency_contact.label }}</label>
+        {{ profile_form.emergency_contact }}
+        {% if profile_form.emergency_contact.help_text %}<p class="d365-help">{{ profile_form.emergency_contact.help_text }}</p>{% endif %}
+        {% if profile_form.emergency_contact.errors %}<span class="d365-field__error">{{ profile_form.emergency_contact.errors.0 }}</span>{% endif %}
+      </div>
+    </section>
+
+    <section class="d365-form-section" aria-labelledby="sec-employment">
+      <h2 class="d365-form-section__title" id="sec-employment">Employment information</h2>
+      <fieldset class="d365-fieldset">
+        <legend class="d365-label">{{ profile_form.sector.label }}</legend>
+        <div class="d365-radio-group">
+          {{ profile_form.sector }}
+        </div>
+        {% if profile_form.sector.errors %}<span class="d365-field__error">{{ profile_form.sector.errors.0 }}</span>{% endif %}
+      </fieldset>
+      <div class="d365-field-row">
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.employee_number.id_for_label }}">{{ profile_form.employee_number.label }}</label>
+          {{ profile_form.employee_number }}
+          {% if profile_form.employee_number.errors %}<span class="d365-field__error">{{ profile_form.employee_number.errors.0 }}</span>{% endif %}
+        </div>
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.job_title.id_for_label }}">{{ profile_form.job_title.label }}</label>
+          {{ profile_form.job_title }}
+          {% if profile_form.job_title.errors %}<span class="d365-field__error">{{ profile_form.job_title.errors.0 }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="d365-field-row">
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.department.id_for_label }}">{{ profile_form.department.label }}</label>
+          {{ profile_form.department }}
+          {% if profile_form.department.errors %}<span class="d365-field__error">{{ profile_form.department.errors.0 }}</span>{% endif %}
+        </div>
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.section_team.id_for_label }}">{{ profile_form.section_team.label }}</label>
+          {{ profile_form.section_team }}
+          {% if profile_form.section_team.errors %}<span class="d365-field__error">{{ profile_form.section_team.errors.0 }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="d365-field">
+        <label class="d365-label" for="{{ profile_form.manager.id_for_label }}">{{ profile_form.manager.label }}</label>
+        {{ profile_form.manager }}
+        {% if profile_form.manager.errors %}<span class="d365-field__error">{{ profile_form.manager.errors.0 }}</span>{% endif %}
+      </div>
+      <div class="d365-field-row">
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.hire_date.id_for_label }}">{{ profile_form.hire_date.label }}</label>
+          {{ profile_form.hire_date }}
+          {% if profile_form.hire_date.errors %}<span class="d365-field__error">{{ profile_form.hire_date.errors.0 }}</span>{% endif %}
+        </div>
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.employment_status.id_for_label }}">{{ profile_form.employment_status.label }}</label>
+          {{ profile_form.employment_status }}
+          {% if profile_form.employment_status.errors %}<span class="d365-field__error">{{ profile_form.employment_status.errors.0 }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="d365-field-row">
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.work_location.id_for_label }}">{{ profile_form.work_location.label }}</label>
+          {{ profile_form.work_location }}
+          {% if profile_form.work_location.errors %}<span class="d365-field__error">{{ profile_form.work_location.errors.0 }}</span>{% endif %}
+        </div>
+        <div class="d365-field">
+          <label class="d365-label" for="{{ profile_form.employee_type.id_for_label }}">{{ profile_form.employee_type.label }}</label>
+          {{ profile_form.employee_type }}
+          {% if profile_form.employee_type.errors %}<span class="d365-field__error">{{ profile_form.employee_type.errors.0 }}</span>{% endif %}
+        </div>
+      </div>
+    </section>
+
+    <div class="d365-form__actions">
+      <button type="submit" class="d365-btn d365-btn--primary">Save changes</button>
+      <a href="{% url 'hierarchy:employee_list' %}" class="d365-link d365-link--standalone">Cancel</a>
+    </div>
+  </form>
+
+  <section class="d365-form-section d365-form-section--attached" aria-labelledby="sec-org-positions">
+    <h2 class="d365-form-section__title" id="sec-org-positions">Organization positions</h2>
+    <p class="d365-form-section__hint">
+      Formal roles defined under <a href="{% url 'hierarchy:organization_overview' %}">Organization</a>.
+      This is separate from the reporting manager below.
+    </p>
+
+    {% if position_assignments %}
+      <ul class="d365-structure-assign-list">
+        {% for a in position_assignments %}
+          <li>
+            <strong><a href="{% url 'hierarchy:position_detail' a.position.pk %}">{{ a.position.title }}</a></strong>
+            {% if a.position.organizational_unit %}<span class="d365-muted"> — {{ a.position.organizational_unit.name }}</span>{% endif %}
+            {% if a.is_primary %}<span class="d365-pill">Primary</span>{% endif %}
+            {% if a.start_date or a.end_date %}
+              <span class="d365-muted">{{ a.start_date|default:"?" }} — {{ a.end_date|default:"open" }}</span>
+            {% endif %}
+            {% if a.notes %}<span class="d365-muted">{{ a.notes }}</span>{% endif %}
+            <form method="post" action="{% url 'hierarchy:position_assignment_delete' a.pk %}" class="d365-inline-form">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.path }}">
+              <button type="submit" class="d365-link d365-link--danger">Remove</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="d365-help">No position assignments yet.</p>
+    {% endif %}
+
+    {% if assign_positions_allowed %}
+    <form method="post" action="{% url 'hierarchy:employee_edit' employee.pk %}" class="d365-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add_assignment">
+      {% if assign_form.non_field_errors %}
+        <div class="d365-form-errors">{{ assign_form.non_field_errors }}</div>
+      {% endif %}
+      {% for field in assign_form %}
+        <div class="d365-field{% if field.errors %} d365-field--error{% endif %}">
+          <label for="{{ field.id_for_label }}" class="d365-label">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<p class="d365-help">{{ field.help_text }}</p>{% endif %}
+          {% for err in field.errors %}<p class="d365-field-error">{{ err }}</p>{% endfor %}
+        </div>
+      {% endfor %}
+      <div class="d365-form-actions">
+        <button type="submit" class="d365-btn d365-btn--primary">Add to position</button>
+      </div>
+    </form>
+    {% else %}
+      <p class="d365-help">This employee record needs a tenant before you can assign organization positions.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

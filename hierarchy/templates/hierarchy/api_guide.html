@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}API guide{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide">
+  <h1>API guide</h1>
+  <p class="d365-card__subtitle">
+    JSON endpoints served by this site. Base URL: <code class="d365-code">{{ site_api_base }}</code>
+  </p>
+
+  <section class="api-guide-section">
+    <h2><code class="d365-code">POST /api/auth/users/</code></h2>
+    <p class="d365-help">Create a user and employee profile. Body: JSON. CSRF exempt.</p>
+    <ul class="d365-help">
+      <li><strong>Required fields:</strong> <code class="d365-code">samAccountName</code>, <code class="d365-code">password</code>, <code class="d365-code">givenName</code>, <code class="d365-code">surname</code>, <code class="d365-code">tenant</code> (tenant slug).</li>
+      <li><strong>Responses:</strong> <strong>201</strong> created; <strong>400</strong> validation / bad tenant; <strong>409</strong> username exists.</li>
+    </ul>
+    <pre class="d365-pre">curl -sS -X POST "{{ site_api_base }}/api/auth/users/" \
+  -H "Content-Type: application/json" \
+  -d '{"samAccountName":"jdoe","password":"SecurePass1!","givenName":"Jane","surname":"Doe","tenant":"default"}'</pre>
+  </section>
+
+  <section class="api-guide-section">
+    <h2><code class="d365-code">POST /api/auth/login/</code></h2>
+    <p class="d365-help">Login with JSON; response sets a session cookie (<code class="d365-code">sessionid</code>). CSRF exempt.</p>
+    <ul class="d365-help">
+      <li><strong>Body:</strong> <code class="d365-code">username</code>, <code class="d365-code">password</code>.</li>
+      <li><strong>Responses:</strong> <strong>200</strong> ok; <strong>401</strong> bad credentials; <strong>403</strong> disabled.</li>
+    </ul>
+    <pre class="d365-pre">curl -sS -c cookies.txt -X POST "{{ site_api_base }}/api/auth/login/" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"jdoe","password":"SecurePass1!"}'</pre>
+  </section>
+
+  <section class="api-guide-section">
+    <h2><code class="d365-code">GET /api/employees/</code></h2>
+    <p class="d365-help">One employee plus signature images (Base64). Query string only.</p>
+    <ul class="d365-help">
+      <li><strong>Query:</strong> <code class="d365-code">tenant_id</code> (required) and exactly one of <code class="d365-code">user_id</code>, <code class="d365-code">username</code>, <code class="d365-code">civil_id</code>.</li>
+      <li><strong>Auth (any one):</strong> <code class="d365-code">Authorization: Bearer</code> token ({% if employee_api_token_configured %}set on server{% else %}optional / may be unset{% endif %}); or tenant API key header (default <code class="d365-code">X-Api-Key</code>, configurable per tenant); or staff session cookie.</li>
+      <li><strong>Typical errors:</strong> <strong>400</strong> bad query; <strong>401</strong> / <strong>403</strong>; <strong>404</strong> not found; <strong>409</strong> duplicate <code class="d365-code">civil_id</code>.</li>
+    </ul>
+    <pre class="d365-pre">curl -sS "{{ site_api_base }}/api/employees/?tenant_id=1&amp;username=jdoe" \
+  -H "X-Api-Key: &lt;secret&gt;"</pre>
+  </section>
+
+  <section class="api-guide-section">
+    <h2>Auth notes (<code class="d365-code">GET /api/employees/</code>)</h2>
+    <ul class="d365-help">
+      <li>Bearer secret: environment <code class="d365-code">EMPLOYEE_API_TOKEN</code>.</li>
+      <li>Tenant key: tenant settings or <code class="d365-code">TENANT_API_KEY_&lt;tenant_id&gt;</code>; header name: tenant settings or <code class="d365-code">TENANT_API_KEY_HEADER_&lt;tenant_id&gt;</code> (default header <code class="d365-code">X-Api-Key</code>).</li>
+    </ul>
+  </section>
+
+  <div class="d365-form__actions">
+    <a href="{% url 'hierarchy:index' %}" class="d365-link d365-link--standalone">Home</a>
+  </div>
+</div>
+{% endblock %}

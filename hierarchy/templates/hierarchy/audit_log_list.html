@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Audit log{% endblock %}
+
+{% block extra_head %}
+<style>
+  .d365-table__details { max-width: min(42rem, 50vw); word-break: break-word; white-space: pre-wrap; font-size: 0.92em; }
+  .d365-table__nowrap { white-space: nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide d365-card--table-card">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>Audit log</h1>
+      <p class="d365-card__subtitle">
+        Records of HTTP requests and notable model and authentication events. Staff only.
+      </p>
+    </div>
+  </div>
+
+  <form method="get" action="{% url 'hierarchy:audit_log_list' %}" class="d365-form d365-form--inline" style="flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+    <div class="d365-field" style="margin-bottom: 0;">
+      <label class="d365-label" for="id-audit-action">Action</label>
+      <select name="action" id="id-audit-action" class="d365-select">
+        <option value="">— All —</option>
+        {% for ac in action_choices %}
+          <option value="{{ ac }}"{% if action_filter == ac %} selected{% endif %}>{{ ac }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="d365-field d365-field--grow" style="margin-bottom: 0; min-width: 200px;">
+      <label class="d365-label" for="id-audit-q">Search details</label>
+      <input type="search" name="q" id="id-audit-q" class="d365-input" value="{{ search_q }}" placeholder="Substring in details…" autocomplete="off">
+    </div>
+    <div class="d365-field" style="margin-bottom: 0; align-self: flex-end;">
+      <button type="submit" class="d365-btn d365-btn--primary">Apply</button>
+    </div>
+  </form>
+
+  {% if not page_obj.object_list %}
+    <p class="d365-empty">No audit entries match your filters.</p>
+  {% else %}
+    <p class="d365-help" style="margin-bottom: 12px;">
+      Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} entries.
+    </p>
+    <div class="d365-table-wrap">
+      <table class="d365-table">
+        <thead>
+          <tr>
+            <th scope="col">Time (UTC)</th>
+            <th scope="col">Action</th>
+            <th scope="col">User</th>
+            <th scope="col">IP</th>
+            <th scope="col">Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in page_obj %}
+            <tr>
+              <td class="d365-table__nowrap">{{ row.created_at|date:"Y-m-d H:i:s" }}</td>
+              <td><code class="d365-code">{{ row.action }}</code></td>
+              <td>{% if row.user %}{{ row.user.get_username }}{% else %}—{% endif %}</td>
+              <td>{{ row.ip_address|default:"—" }}</td>
+              <td class="d365-table__details">{{ row.details }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="d365-pagination" aria-label="Audit log pages" style="margin-top: 16px;">
+      {% if page_obj.has_previous %}
+        <a class="d365-btn" href="{% if filter_query %}?{{ filter_query }}&{% else %}?{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+      {% endif %}
+      <span class="d365-help" style="margin: 0 12px;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a class="d365-btn" href="{% if filter_query %}?{{ filter_query }}&{% else %}?{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+      {% endif %}
+    </nav>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
