@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 import os
 
+from django.utils.translation import gettext_lazy as _
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -44,6 +46,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -62,10 +65,13 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
+                'django.template.context_processors.i18n',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'hierarchy.context_processors.tenant_switcher',
                 'hierarchy.context_processors.employee_photo_bar',
+                'hierarchy.context_processors.directory_search_bar',
+                'hierarchy.context_processors.staff_employee_profile_notice',
             ],
         },
     },
@@ -106,7 +112,10 @@ else:
             "PORT": os.environ.get("DJANGO_DB_PORT", "3306"),
             "CONN_MAX_AGE": 60,
             "OPTIONS": {
-                "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+                "init_command": (
+                    "SET sql_mode='STRICT_TRANS_TABLES', "
+                    "NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
+                ),
                 "charset": "utf8mb4",
             },
         }
@@ -135,7 +144,14 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'en'
+
+LANGUAGES = [
+    ('en', _('English')),
+    ('ar', _('Arabic')),
+]
+
+LOCALE_PATHS = [BASE_DIR / 'locale']
 
 TIME_ZONE = 'UTC'
 
@@ -165,5 +181,5 @@ EXTERNAL_API_HEALTH_URL = os.environ.get(
 )
 EXTERNAL_API_HEALTH_TIMEOUT = int(os.environ.get('EXTERNAL_API_HEALTH_TIMEOUT', '10'))
 
-# Optional Bearer token for GET /api/employees/ (machine-to-machine). Staff session also allowed.
-EMPLOYEE_API_TOKEN = os.environ.get("EMPLOYEE_API_TOKEN", "dfbf1ccfc84444bde9cf80d98c14b5203405ba42e7fc7e7459c1144cf049d23c").strip()
+# Optional global Bearer for ops only (leave unset in production; prefer per-tenant API keys).
+EMPLOYEE_API_TOKEN = os.environ.get("EMPLOYEE_API_TOKEN", "").strip()

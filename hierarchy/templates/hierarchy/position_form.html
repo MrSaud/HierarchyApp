@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 
 {% block title %}{% if is_edit %}Edit position{% else %}New position{% endif %}{% endblock %}
 
@@ -10,9 +11,9 @@
       <p class="d365-card__subtitle">Tenant: {{ structure_tenant.name }}</p>
     </div>
     {% if is_edit %}
-    <a href="{% url 'hierarchy:position_detail' position.pk %}" class="d365-btn">Position detail</a>
+    <a href="{% url 'hierarchy:position_detail' position.pk %}" class="d365-btn">{% trans "Position detail" %}</a>
     {% else %}
-    <a href="{% url 'hierarchy:position_list' %}" class="d365-btn">Back to list</a>
+    <a href="{% url 'hierarchy:position_list' %}" class="d365-btn">{% trans "Back to list" %}</a>
     {% endif %}
   </div>
 

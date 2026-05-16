@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 
 {% block title %}{% if is_edit %}Edit unit{% else %}New unit{% endif %}{% endblock %}
 
@@ -9,11 +10,24 @@
       <h1>{% if is_edit %}Edit organizational unit{% else %}New organizational unit{% endif %}</h1>
       <p class="d365-card__subtitle">Tenant: {{ structure_tenant.name }}</p>
     </div>
-    <a href="{% url 'hierarchy:org_unit_list' %}" class="d365-btn">Back to list</a>
+    <div class="d365-card__actions">
+      <a href="{% url 'hierarchy:org_unit_type_list' %}" class="d365-btn">{% trans "Unit types" %}</a>
+      <a href="{% url 'hierarchy:org_unit_type_create' %}" class="d365-btn">{% trans "New unit type" %}</a>
+      <a href="{% if cancel_url %}{{ cancel_url }}{% else %}{% url 'hierarchy:org_unit_list' %}{% endif %}" class="d365-btn d365-btn--primary">
+        {% if return_to_overview %}Back to structure{% else %}Back to list{% endif %}
+      </a>
+    </div>
   </div>
+
+  {% if preset_parent and not is_edit %}
+  <p class="d365-help d365-org-form-context">
+    Sub-unit of <strong>{{ preset_parent.name }}</strong>{% if preset_parent.code %} ({{ preset_parent.code }}){% endif %}.
+  </p>
+  {% endif %}
 
   <form method="post" class="d365-form">
     {% csrf_token %}
+    {% if return_to_overview %}<input type="hidden" name="next" value="overview">{% endif %}
     {% if form.non_field_errors %}
       <div class="d365-form-errors">{{ form.non_field_errors }}</div>
     {% endif %}
@@ -22,6 +36,13 @@
         <label for="{{ field.id_for_label }}" class="d365-label">{{ field.label }}</label>
         {{ field }}
         {% if field.help_text %}<p class="d365-help">{{ field.help_text }}</p>{% endif %}
+        {% if field.name == 'unit_type' %}
+        <p class="d365-help">
+          <a href="{% url 'hierarchy:org_unit_type_list' %}" class="d365-link d365-link--standalone">{% trans "Unit types" %}</a>
+          <span class="d365-muted" aria-hidden="true"> · </span>
+          <a href="{% url 'hierarchy:org_unit_type_create' %}" class="d365-link d365-link--standalone">{% trans "New unit type" %}</a>
+        </p>
+        {% endif %}
         {% for err in field.errors %}<p class="d365-field-error">{{ err }}</p>{% endfor %}
       </div>
     {% endfor %}

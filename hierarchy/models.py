@@ -46,6 +46,62 @@ class Tenant(models.Model):
         return getattr(settings, "EXTERNAL_API_HEALTH_URL", "")
 
 
+class OrgUnitType(models.TextChoices):
+    """Built-in slug constants for seeds and default catalog rows."""
+
+    MINISTER = "minister", "Minister (DG)"
+    DEPUTY_DG = "deputy_dg", "Deputy DG"
+    SECTOR = "sector", "Sector (Program)"
+    GENERAL_ADMIN = "general_admin", "General administration"
+    DEPARTMENT = "department", "Department"
+    CONTROLLER = "controller", "Controller"
+    SECTION = "section", "Section"
+    REGIONAL_DIRECTORATE = "regional_directorate", "Regional directorate"
+
+
+class OrgUnitTypeDefinition(models.Model):
+    """Per-tenant organizational unit type (label, hierarchy rank, root rules)."""
+
+    tenant = models.ForeignKey(
+        Tenant,
+        on_delete=models.CASCADE,
+        related_name="org_unit_type_definitions",
+    )
+    slug = models.SlugField(
+        max_length=64,
+        help_text="Stable code stored on units (e.g. department). Letters, numbers, underscores.",
+    )
+    label = models.CharField(max_length=120)
+    rank = models.PositiveSmallIntegerField(
+        default=50,
+        help_text="Lower = higher in hierarchy. Parent must have a lower rank than child.",
+    )
+    allows_root = models.BooleanField(
+        default=False,
+        help_text="May exist without a parent unit (top-level).",
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["sort_order", "rank", "label"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "slug"],
+                name="hierarchy_orgunittype_tenant_slug_uniq",
+            ),
+        ]
+        verbose_name = "organizational unit type"
+
+    def __str__(self):
+        return self.label
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.slug and self.slug != self.slug.lower():
+            raise ValidationError({"slug": "Use lowercase letters, numbers, and underscores only."})
+
+
 class OrganizationalUnit(models.Model):
     """Tenant org chart bucket (department, division, team cluster), optionally nested."""
 
@@ -67,6 +123,12 @@ class OrganizationalUnit(models.Model):
         blank=True,
         help_text="Short code for exports (optional).",
     )
+    unit_type = models.CharField(
+        max_length=64,
+        default=OrgUnitType.DEPARTMENT,
+        db_index=True,
+        help_text="Slug of an organizational unit type defined for this tenant.",
+    )
     sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
@@ -75,6 +137,11 @@ class OrganizationalUnit(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_unit_type_display(self):
+        from .org_unit_types import resolve_unit_type_label
+
+        return resolve_unit_type_label(self.tenant_id, self.unit_type)
 
     def clean(self):
         from django.core.exceptions import ValidationError
@@ -88,6 +155,12 @@ class OrganizationalUnit(models.Model):
             and self.parent.tenant_id != self.tenant_id
         ):
             raise ValidationError({"parent": "Parent must belong to the same tenant."})
+
+        from .org_unit_types import validate_org_unit_parent_type, validate_unit_type_slug
+
+        validate_unit_type_slug(self.tenant_id, self.unit_type)
+        parent = self.parent if self.parent_id else None
+        validate_org_unit_parent_type(self, parent)
 
 
 class Position(models.Model):
@@ -150,7 +223,7 @@ class PositionAssignment(models.Model):
     )
     is_primary = models.BooleanField(
         default=True,
-        help_text="Marks the main role when someone holds several positions.",
+        help_text="Main role when someone holds several positions; at most one assignment per employee may be primary.",
     )
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
@@ -167,13 +240,26 @@ class PositionAssignment(models.Model):
 
         if self.start_date and self.end_date and self.end_date < self.start_date:
             raise ValidationError({"end_date": "End date cannot be before start date."})
+        if not self.position_id:
+            raise ValidationError({"position": "Position is required."})
+        if not self.employee_id:
+            raise ValidationError({"employee": "Employee is required."})
         emp_tid = self.employee.tenant_id
         if emp_tid is None:
             raise ValidationError({"employee": "Employee has no tenant assigned."})
-        if emp_tid != self.position.tenant_id:
+        pos_tid = self.position.tenant_id
+        if emp_tid != pos_tid:
             raise ValidationError(
                 {"employee": "Employee must belong to the same tenant as the position."}
             )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_primary and self.employee_id:
+            type(self).objects.filter(
+                employee_id=self.employee_id,
+                is_primary=True,
+            ).exclude(pk=self.pk).update(is_primary=False)
 
 
 class Sector(models.TextChoices):
@@ -210,6 +296,130 @@ class EmployeeType(models.TextChoices):
     PART_TIME = "part_time", "Part-time"
     CONTRACTOR = "contractor", "Contractor"
     INTERN = "intern", "Intern"
+
+
+class DelegationTemplate(models.Model):
+    """
+    Reusable pattern for delegations (e.g. acting director): default duration,
+    full vs partial substitute, and which positions qualify as delegatee.
+    """
+
+    tenant = models.ForeignKey(
+        Tenant,
+        on_delete=models.CASCADE,
+        related_name="delegation_templates",
+    )
+    name = models.CharField(max_length=120)
+    description = models.TextField(
+        blank=True,
+        help_text="Internal notes on when to use this pattern (e.g. acting director leave).",
+    )
+    default_duration_days = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="If set, applying this template fills end date as start + N days when end is left blank.",
+    )
+    default_is_full_substitute = models.BooleanField(
+        default=True,
+        help_text="Default for “full substitute” (overlapping full delegations per delegator are blocked).",
+    )
+    eligible_delegatee_positions = models.ManyToManyField(
+        "Position",
+        blank=True,
+        related_name="delegation_templates_eligible",
+        help_text="If any are selected, the delegatee must currently hold one of these positions. "
+        "Leave empty to allow any employee in the tenant.",
+    )
+    sort_order = models.PositiveIntegerField(
+        default=0,
+        help_text="Order in the “start from template” dropdown.",
+    )
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        verbose_name = "delegation template"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "name"],
+                name="hierarchy_delegationtemplate_tenant_name_uniq",
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class Delegation(models.Model):
+    """
+    Temporary authority: one employee (delegatee) acts on behalf of another (delegator).
+    """
+
+    tenant = models.ForeignKey(
+        Tenant,
+        on_delete=models.CASCADE,
+        related_name="delegations",
+    )
+    delegator = models.ForeignKey(
+        "Employee",
+        on_delete=models.CASCADE,
+        related_name="delegations_given",
+    )
+    delegatee = models.ForeignKey(
+        "Employee",
+        on_delete=models.CASCADE,
+        related_name="delegations_received",
+    )
+    start_date = models.DateField()
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Leave empty for an open-ended delegation.",
+    )
+    notes = models.CharField(max_length=500, blank=True)
+    is_full_substitute = models.BooleanField(
+        default=True,
+        help_text="Full substitute: this person fully acts for the delegator. "
+        "Only one overlapping full delegation per delegator is allowed.",
+    )
+    template = models.ForeignKey(
+        DelegationTemplate,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="delegations",
+        help_text="Pattern used when this delegation was created (optional).",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-start_date", "pk"]
+        verbose_name = "delegation"
+
+    def __str__(self):
+        return f"{self.delegator} → {self.delegatee}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValidationError({"end_date": "End date cannot be before start date."})
+        if self.delegator_id and self.delegatee_id and self.delegator_id == self.delegatee_id:
+            raise ValidationError({"delegatee": "Delegator and delegatee must be different people."})
+        if not self.delegator_id or not self.delegatee_id:
+            return
+        if self.delegator.tenant_id != self.delegatee.tenant_id:
+            raise ValidationError(
+                {"delegatee": "Delegator and delegatee must belong to the same tenant."}
+            )
+        tid = self.tenant_id
+        if tid is None:
+            return
+        for label, emp in (("delegator", self.delegator), ("delegatee", self.delegatee)):
+            if emp.tenant_id != tid:
+                raise ValidationError({label: "Employee must belong to this tenant."})
+        from .delegation_policy import validate_delegation_conflicts
+
+        validate_delegation_conflicts(self)
 
 
 class Employee(models.Model):

@@ -1,5 +1,7 @@
+from .access import resolve_active_structure_tenant
 from .models import Employee, Tenant
 from .tenant_scope import get_superuser_active_tenant, prune_stale_session_tenant
+from .user_tenant import get_user_tenant_id
 
 
 def _user_initials(user):
@@ -37,3 +39,29 @@ def tenant_switcher(request):
     # Superusers can scope to any tenant (including inactive) for administration.
     ctx["tenant_switch_choices"] = list(Tenant.objects.order_by("name"))
     return ctx
+
+
+def staff_employee_profile_notice(request):
+    """Staff (non-superuser) without an Employee row cannot access tenant-scoped data."""
+    out = {"staff_needs_employee_profile": False}
+    user = request.user
+    if not user.is_authenticated or not user.is_staff or user.is_superuser:
+        return out
+    if get_user_tenant_id(user) is None:
+        out["staff_needs_employee_profile"] = True
+    return out
+
+
+def directory_search_bar(request):
+    """Show global directory search when staff has a resolved structure tenant."""
+    out = {"directory_search_enabled": False, "app_bar_search_q": ""}
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return out
+    tenant = resolve_active_structure_tenant(request)
+    out["directory_search_enabled"] = tenant is not None
+    rm = getattr(request, "resolver_match", None)
+    if tenant is not None and rm and rm.url_name == "hub_search":
+        q = (request.GET.get("q") or "").strip()
+        if q:
+            out["app_bar_search_q"] = q[:200]
+    return out

@@ -1,69 +1,136 @@
 {% extends "base.html" %}
+{% load static i18n %}
 
-{% block title %}Organization structure{% endblock %}
+{% block title %}{% trans "Organization structure" %}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/organization-structure.css' %}?v=8">
+{% endblock %}
 
 {% block content %}
-<div class="d365-card d365-card--wide">
+<div class="d365-card d365-page-card d365-org-overview" id="org-structure-page">
   <div class="d365-card__header-row">
     <div>
-      <h1>Organization structure</h1>
+      <h1>{% trans "Organization structure" %}</h1>
       {% if structure_tenant %}
       <p class="d365-card__subtitle">
         Tenant: <strong>{{ structure_tenant.name }}</strong>
-        · {{ stats.units }} unit(s), {{ stats.positions }} position(s), {{ stats.assignments }} assignment(s).
+        <span class="d365-org-summary">
+          · {{ stats.units }} units · {{ stats.positions }} positions · {{ stats.assignments }} assignments
+        </span>
       </p>
       {% else %}
-      <p class="d365-card__subtitle">Define departments, positions, and who holds each role.</p>
+      <p class="d365-card__subtitle">Units, positions, and assignments for your tenant.</p>
       {% endif %}
     </div>
     {% if structure_tenant %}
     <div class="d365-card__actions">
-      <a href="{% url 'hierarchy:org_unit_list' %}" class="d365-btn">Units</a>
-      <a href="{% url 'hierarchy:position_list' %}" class="d365-btn">Positions</a>
-      <a href="{% url 'hierarchy:org_unit_create' %}" class="d365-btn d365-btn--primary">New unit</a>
-      <a href="{% url 'hierarchy:position_create' %}" class="d365-btn d365-btn--primary">New position</a>
+      <a href="{% url 'hierarchy:hub_search' %}" class="d365-btn">{% trans "Directory search" %}</a>
+      <a href="{% url 'hierarchy:org_unit_list' %}" class="d365-btn">{% trans "Units" %}</a>
+      <a href="{% url 'hierarchy:position_list' %}" class="d365-btn">{% trans "Positions" %}</a>
+      <a href="{% url 'hierarchy:delegation_list' %}" class="d365-btn">{% trans "Delegations" %}</a>
+      <a href="{% url 'hierarchy:position_assign_board' %}" class="d365-btn d365-btn--primary">{% trans "Assign people" %}</a>
+      <a href="{% url 'hierarchy:org_unit_create' %}?next=overview" class="d365-btn">{% trans "New unit" %}</a>
     </div>
     {% endif %}
   </div>
 
   {% if not structure_tenant %}
-    <p class="d365-help">Superusers: pick <strong>Scope</strong> in the app bar. Tenant staff: structure uses your employee tenant automatically.</p>
+    <p class="d365-help">Superusers: pick <strong>Scope</strong> in the app bar. Tenant staff: uses your employee tenant automatically.</p>
   {% elif not branches and not loose_positions %}
     <p class="d365-empty">No organizational units or positions yet.
-      <a href="{% url 'hierarchy:org_unit_create' %}">Create a unit</a> or
-      <a href="{% url 'hierarchy:position_create' %}">create a position</a>.
+      <a href="{% url 'hierarchy:org_unit_create' %}">{% trans "Create a unit" %}</a> or
+      <a href="{% url 'hierarchy:position_create' %}">{% trans "create a position" %}</a>.
     </p>
   {% else %}
-    {% if loose_positions %}
-    <section class="d365-structure-section">
-      <h2 class="d365-structure-section__title">Positions without a unit</h2>
-      <ul class="d365-structure-positions">
-        {% for p in loose_positions %}
-          <li>
-            <a href="{% url 'hierarchy:position_detail' p.pk %}">{{ p.title }}</a>
-            {% if p.code %}<span class="d365-muted">({{ p.code }})</span>{% endif %}
-            {% if not p.is_active %}<span class="d365-pill d365-pill--muted">Inactive</span>{% endif %}
-            {% with cur=p.org_current_assignments %}
-              {% if cur %}
-                <span class="d365-structure-assignees">— {% for a in cur %}<span>{{ a.employee.user.get_full_name|default:a.employee.user.username }}{% if a.is_primary %} <abbr title="Primary position">*</abbr>{% endif %}{% if not forloop.last %}, {% endif %}</span>{% endfor %}</span>
-              {% else %}
-                <span class="d365-structure-assignees d365-structure-assignees--empty">— vacant</span>
-              {% endif %}
-            {% endwith %}
-          </li>
-        {% endfor %}
-      </ul>
-    </section>
-    {% endif %}
+    <div class="d365-org-layout">
+      {% if unit_search_list %}
+      <aside
+        class="d365-org-sidebar is-collapsed"
+        id="org-unit-search-panel"
+        aria-label="Find a unit"
+      >
+        <div class="d365-org-sidebar__head">
+          <button
+            type="button"
+            class="d365-org-sidebar__toggle"
+            id="org-unit-search-toggle"
+            aria-expanded="false"
+            aria-controls="org-unit-search-body"
+            title="Expand find unit"
+          >
+            <span class="d365-org-sidebar__chevron" aria-hidden="true"></span>
+            <span class="d365-visually-hidden">Toggle find unit</span>
+          </button>
+          <span class="d365-org-sidebar__title">Find unit</span>
+          <span class="d365-org-sidebar__count">{{ unit_search_list|length }}</span>
+        </div>
+        <div class="d365-org-sidebar__body" id="org-unit-search-body">
+          
+          <input
+            type="search"
+            id="org-unit-search"
+            class="d365-input d365-org-search"
+            placeholder="Name or code…"
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <p class="d365-help d365-org-search-hint" id="org-unit-search-hint">{{ unit_search_list|length }} unit(s)</p>
+          <ul class="d365-org-unit-picker" id="org-unit-picker">
+            {% for u in unit_search_list %}
+              <li>
+                <button
+                  type="button"
+                  class="d365-org-unit-picker__btn"
+                  data-unit-id="{{ u.id }}"
+                  data-search="{{ u.name }} {{ u.code }} {{ u.path }}"
+                >
+                  <span class="d365-org-unit-picker__name">{{ u.name }}</span>
+                  {% if u.code %}<span class="d365-org-unit-picker__code">{{ u.code }}</span>{% endif %}
+                  <span class="d365-org-unit-picker__path">{{ u.path }}</span>
+                </button>
+              </li>
+            {% endfor %}
+          </ul>
+          <p class="d365-org-search-empty" id="org-unit-search-empty" hidden>No units match your search.</p>
+        </div>
+      </aside>
+      {% endif %}
 
-    {% if branches %}
-    <section class="d365-structure-section">
-      <h2 class="d365-structure-section__title">By organizational unit</h2>
-      {% for branch in branches %}
-        {% include "hierarchy/_organization_branch.html" with branch=branch %}
-      {% endfor %}
-    </section>
-    {% endif %}
+      <div class="d365-org-main">
+        {% if loose_positions %}
+        <section class="d365-org-block">
+          <h2 class="d365-org-block__title">{% trans "Positions without a unit" %}</h2>
+          <ul class="d365-org-positions">
+            {% for p in loose_positions %}
+              {% include "hierarchy/_organization_position_row.html" with p=p %}
+            {% endfor %}
+          </ul>
+        </section>
+        {% endif %}
+
+        {% if branches %}
+        <section class="d365-org-block" id="org-unit-tree">
+          <div class="d365-org-block__toolbar">
+            <h2 class="d365-org-block__title">{% trans "Structure" %}</h2>
+            <div class="d365-org-tree-actions">
+              <button type="button" class="d365-btn d365-btn--compact" id="org-expand-all">{% trans "Expand all" %}</button>
+              <button type="button" class="d365-btn d365-btn--compact" id="org-collapse-all">{% trans "Collapse all" %}</button>
+            </div>
+          </div>
+          <div class="d365-org-tree">
+            {% for branch in branches %}
+              {% include "hierarchy/_organization_branch.html" with branch=branch depth=0 %}
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+      </div>
+    </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/organization-structure.js' %}?v=5" defer></script>
 {% endblock %}

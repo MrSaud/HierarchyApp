@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Directory search" %}{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>{% trans "Directory search" %}</h1>
+      {% if structure_tenant %}
+      <p class="d365-card__subtitle">Tenant: <strong>{{ structure_tenant.name }}</strong></p>
+      {% endif %}
+    </div>
+    <a href="{% url 'hierarchy:index' %}" class="d365-btn">{% trans "Home" %}</a>
+  </div>
+
+  {% if not structure_tenant %}
+  <p class="d365-help">Choose a tenant in <strong>Scope</strong> (superuser) to search this directory.</p>
+  {% else %}
+  <form method="get" action="{% url 'hierarchy:hub_search' %}" class="d365-form d365-hub-search-form" role="search">
+    <div class="d365-field">
+      
+      <div class="d365-hub__search-row">
+        <input
+          type="search"
+          id="id-hub-q"
+          name="q"
+          class="d365-input d365-hub__search-input"
+          placeholder="Name, username, unit, position…"
+          minlength="2"
+          autocomplete="off"
+          value="{{ search_query }}"
+        >
+        <button type="submit" class="d365-btn d365-btn--primary">{% trans "Search" %}</button>
+      </div>
+      <p class="d365-help">At least 2 characters. Searches employees, units, and positions in this tenant.</p>
+    </div>
+  </form>
+
+  {% if too_short %}
+  <p class="d365-help">Enter at least two characters to search.</p>
+  {% elif search_query %}
+    {% if not employees and not org_units and not positions %}
+    <p class="d365-empty">No matches for “{{ search_query }}”.</p>
+    {% else %}
+    {% if employees %}
+    <section class="d365-structure-section" aria-labelledby="hub-sec-emp">
+      <h2 class="d365-structure-section__title" id="hub-sec-emp">People ({{ employees|length }})</h2>
+      <ul class="d365-structure-assign-list">
+        {% for e in employees %}
+        <li>
+          <strong><a href="{% url 'hierarchy:employee_edit' e.pk %}">{{ e.user.get_full_name|default:e.user.username }}</a></strong>
+          <span class="d365-muted">@{{ e.user.username }}{% if e.job_title %} · {{ e.job_title }}{% endif %}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+    {% if org_units %}
+    <section class="d365-structure-section" aria-labelledby="hub-sec-ou">
+      <h2 class="d365-structure-section__title" id="hub-sec-ou">Units ({{ org_units|length }})</h2>
+      <ul class="d365-structure-assign-list">
+        {% for u in org_units %}
+        <li>
+          <strong>
+            <a href="{% url 'hierarchy:organization_overview' %}#org-unit-{{ u.pk }}">{{ u.name }}</a>
+          </strong>
+          <span class="d365-muted">
+            <a href="{% url 'hierarchy:org_unit_edit' u.pk %}" class="d365-link d365-link--compact">{% trans "Edit" %}</a>
+            {% if u.code %} · {{ u.code }}{% endif %}
+            {% if u.parent %} · under {{ u.parent.name }}{% endif %}
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+    {% if positions %}
+    <section class="d365-structure-section" aria-labelledby="hub-sec-pos">
+      <h2 class="d365-structure-section__title" id="hub-sec-pos">Positions ({{ positions|length }})</h2>
+      <ul class="d365-structure-assign-list">
+        {% for p in positions %}
+        <li>
+          <strong><a href="{% url 'hierarchy:position_detail' p.pk %}">{{ p.title }}</a></strong>
+          {% if p.code %}<span class="d365-muted">{{ p.code }}</span>{% endif %}
+          {% if p.organizational_unit %}<span class="d365-muted">· {{ p.organizational_unit.name }}</span>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+    {% endif %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

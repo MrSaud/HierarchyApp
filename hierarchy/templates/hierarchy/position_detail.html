@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 
 {% block title %}{{ position.title }}{% endblock %}
 
@@ -15,8 +16,9 @@
       </p>
     </div>
     <div class="d365-card__actions">
-      <a href="{% url 'hierarchy:position_list' %}" class="d365-btn">All positions</a>
-      <a href="{% url 'hierarchy:position_edit' position.pk %}" class="d365-btn d365-btn--primary">Edit position</a>
+      <a href="{% url 'hierarchy:position_list' %}" class="d365-btn">{% trans "All positions" %}</a>
+      <a href="{% url 'hierarchy:position_assign_board' %}?position={{ position.pk }}" class="d365-btn">{% trans "Assign people" %}</a>
+      <a href="{% url 'hierarchy:position_edit' position.pk %}" class="d365-btn d365-btn--primary">{% trans "Edit position" %}</a>
     </div>
   </div>
 
@@ -24,8 +26,40 @@
     <p class="d365-help">{{ position.description|linebreaksbr }}</p>
   {% endif %}
 
-  <section class="d365-form-section d365-form-section--attached" aria-labelledby="sec-assign">
-    <h2 class="d365-form-section__title" id="sec-assign">Assign someone</h2>
+  {% with cur=position.org_current_assignments %}
+  <section class="d365-form-section d365-form-section--attached" aria-labelledby="sec-current">
+    <h2 class="d365-form-section__title" id="sec-current">{% trans "Current assignments" %}</h2>
+    <p class="d365-help">
+      <a href="{% url 'hierarchy:position_assign_board' %}?position={{ position.pk }}">{% trans "Assign to positions" %}</a>
+      to add or remove people on this role.
+    </p>
+    {% if cur %}
+      <ul class="d365-structure-assign-list">
+        {% for a in cur %}
+          <li>
+            <strong>{{ a.employee.user.get_full_name|default:a.employee.user.username }}</strong>
+            {% if a.start_date or a.end_date %}
+              <span class="d365-muted">
+                {% if a.start_date %}{{ a.start_date }}{% else %}?{% endif %}
+                —
+                {% if a.end_date %}{{ a.end_date }}{% else %}open{% endif %}
+              </span>
+            {% endif %}
+            {% if a.notes %}<span class="d365-muted">{{ a.notes }}</span>{% endif %}
+            <form method="post" action="{% url 'hierarchy:position_assignment_delete' a.pk %}" class="d365-inline-form">
+              {% csrf_token %}
+              <button type="submit" class="d365-link d365-link--danger">{% trans "Remove" %}</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="d365-empty">No one is assigned to this position.</p>
+    {% endif %}
+  </section>
+
+  <section class="d365-form-section" aria-labelledby="sec-assign">
+    <h2 class="d365-form-section__title" id="sec-assign">{% trans "Add assignment" %}</h2>
     <form method="post" class="d365-form">
       {% csrf_token %}
       {% if assign_form.non_field_errors %}
@@ -40,45 +74,16 @@
         </div>
       {% endfor %}
       <div class="d365-form-actions">
-        <button type="submit" class="d365-btn d365-btn--primary">Add assignment</button>
+        <button type="submit" class="d365-btn d365-btn--primary">{% trans "Assign" %}</button>
       </div>
     </form>
   </section>
-
-  <section class="d365-form-section" aria-labelledby="sec-current">
-    <h2 class="d365-form-section__title" id="sec-current">Current assignments</h2>
-    {% with cur=position.org_current_assignments %}
-      {% if cur %}
-        <ul class="d365-structure-assign-list">
-          {% for a in cur %}
-            <li>
-              <strong>{{ a.employee.user.get_full_name|default:a.employee.user.username }}</strong>
-              {% if a.is_primary %}<span class="d365-pill">Primary</span>{% endif %}
-              {% if a.start_date or a.end_date %}
-                <span class="d365-muted">
-                  {% if a.start_date %}{{ a.start_date }}{% else %}?{% endif %}
-                  —
-                  {% if a.end_date %}{{ a.end_date }}{% else %}open{% endif %}
-                </span>
-              {% endif %}
-              {% if a.notes %}<span class="d365-muted">{{ a.notes }}</span>{% endif %}
-              <form method="post" action="{% url 'hierarchy:position_assignment_delete' a.pk %}" class="d365-inline-form">
-                {% csrf_token %}
-                <button type="submit" class="d365-link d365-link--danger">Remove</button>
-              </form>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="d365-empty">No active assignments for today’s date.</p>
-      {% endif %}
-    {% endwith %}
-  </section>
+  {% endwith %}
 
   {% with past=position.org_past_assignments %}
     {% if past %}
     <section class="d365-form-section" aria-labelledby="sec-past">
-      <h2 class="d365-form-section__title" id="sec-past">Past assignments</h2>
+      <h2 class="d365-form-section__title" id="sec-past">{% trans "Past assignments" %}</h2>
       <ul class="d365-structure-assign-list d365-structure-assign-list--muted">
         {% for a in past %}
           <li>

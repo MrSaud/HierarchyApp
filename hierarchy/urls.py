@@ -1,17 +1,44 @@
 from django.urls import path
 
-from . import auth_api, employee_api, organization_views, views
+from . import (
+    api_v1,
+    auth_api,
+    bulk_api,
+    delegation_template_views,
+    delegation_views,
+    employee_api,
+    org_unit_type_views,
+    organization_api,
+    organization_views,
+    reports_to_api,
+    views,
+)
 
 urlpatterns = [
     path("", views.index, name="index"),
+    path("tools/directory-search/", views.hub_search, name="hub_search"),
     path("employee-photo/", views.employee_photo, name="employee_photo"),
     path("tenants/switch/", views.tenant_switch, name="tenant_switch"),
     path("tenants/new/", views.tenant_create, name="tenant_create"),
     path("tenants/<int:pk>/edit/", views.tenant_edit, name="tenant_edit"),
+    path("tenants/<int:pk>/api-access/", views.tenant_api_access, name="tenant_api_access_for"),
+    path("tenants/api-access/", views.tenant_api_access, name="tenant_api_access"),
     path("tenants/", views.tenant_list, name="tenant_list"),
     path("api/auth/users/", auth_api.api_users, name="api_users"),
     path("api/auth/login/", auth_api.api_login, name="api_login"),
+    path("api/v1/organization/units/bulk/", bulk_api.api_v1_org_units_bulk_patch, name="api_v1_org_units_bulk"),
+    path(
+        "api/v1/organization/assignments/bulk/",
+        bulk_api.api_v1_assignments_bulk_patch,
+        name="api_v1_assignments_bulk",
+    ),
+    path("api/v1/organization/assignments/", api_v1.api_v1_assignments_list, name="api_v1_assignments_list"),
+    path("api/v1/organization/units/", api_v1.api_v1_org_units_list, name="api_v1_org_units_list"),
+    path("api/v1/employees/reports-to/", api_v1.api_v1_employee_reports_to_get, name="api_v1_employee_reports_to"),
+    path("api/v1/employees/", api_v1.api_v1_employee_get, name="api_v1_employee_get"),
+    path("api/employees/reports-to/", reports_to_api.api_reports_to_get, name="api_reports_to"),
     path("api/employees/", employee_api.api_employee_get, name="api_employee_get"),
+    path("api/organization/units/", organization_api.api_org_units_list, name="api_org_units_list"),
     path("tools/api-health/", views.api_health_test, name="api_health_test"),
     path("tools/api-guide/", views.api_guide, name="api_guide"),
     path("tools/audit-log/", views.audit_log_list, name="audit_log_list"),
@@ -21,8 +48,49 @@ urlpatterns = [
     path("organization/units/new/", organization_views.org_unit_create, name="org_unit_create"),
     path("organization/units/<int:pk>/edit/", organization_views.org_unit_edit, name="org_unit_edit"),
     path("organization/units/", organization_views.org_unit_list, name="org_unit_list"),
+    path(
+        "organization/unit-types/new/",
+        org_unit_type_views.org_unit_type_create,
+        name="org_unit_type_create",
+    ),
+    path(
+        "organization/unit-types/<int:pk>/edit/",
+        org_unit_type_views.org_unit_type_edit,
+        name="org_unit_type_edit",
+    ),
+    path(
+        "organization/unit-types/<int:pk>/remove/",
+        org_unit_type_views.org_unit_type_delete,
+        name="org_unit_type_delete",
+    ),
+    path(
+        "organization/unit-types/restore-defaults/",
+        org_unit_type_views.org_unit_type_restore_defaults,
+        name="org_unit_type_restore_defaults",
+    ),
+    path("organization/unit-types/", org_unit_type_views.org_unit_type_list, name="org_unit_type_list"),
     path("organization/positions/new/", organization_views.position_create, name="position_create"),
     path("organization/positions/<int:pk>/edit/", organization_views.position_edit, name="position_edit"),
+    path(
+        "organization/assignments/board/",
+        organization_views.position_assign_board,
+        name="position_assign_board",
+    ),
+    path(
+        "organization/assignments/board/position/<int:pk>/",
+        organization_views.position_assign_board_position,
+        name="position_assign_board_position",
+    ),
+    path(
+        "organization/assignments/board/assign/",
+        organization_views.position_assign_board_assign,
+        name="position_assign_board_assign",
+    ),
+    path(
+        "organization/assignments/board/unassign/",
+        organization_views.position_assign_board_unassign,
+        name="position_assign_board_unassign",
+    ),
     path(
         "organization/assignments/<int:pk>/remove/",
         organization_views.position_assignment_delete,
@@ -30,6 +98,30 @@ urlpatterns = [
     ),
     path("organization/positions/<int:pk>/", organization_views.position_detail, name="position_detail"),
     path("organization/positions/", organization_views.position_list, name="position_list"),
+    path(
+        "delegations/templates/new/",
+        delegation_template_views.delegation_template_create,
+        name="delegation_template_create",
+    ),
+    path(
+        "delegations/templates/<int:pk>/edit/",
+        delegation_template_views.delegation_template_edit,
+        name="delegation_template_edit",
+    ),
+    path(
+        "delegations/templates/<int:pk>/remove/",
+        delegation_template_views.delegation_template_delete,
+        name="delegation_template_delete",
+    ),
+    path(
+        "delegations/templates/",
+        delegation_template_views.delegation_template_list,
+        name="delegation_template_list",
+    ),
+    path("delegations/new/", delegation_views.delegation_create, name="delegation_create"),
+    path("delegations/<int:pk>/edit/", delegation_views.delegation_edit, name="delegation_edit"),
+    path("delegations/<int:pk>/remove/", delegation_views.delegation_delete, name="delegation_delete"),
+    path("delegations/", delegation_views.delegation_list, name="delegation_list"),
     path("employees/<int:pk>/signatures/", views.signature_manage, name="signature_manage"),
     path(
         "employees/signatures/bulk/",

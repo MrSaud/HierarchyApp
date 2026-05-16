@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% if is_edit %}Edit template{% else %}New delegation template{% endif %}{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>{% if is_edit %}Edit delegation template{% else %}New delegation template{% endif %}</h1>
+      <p class="d365-card__subtitle">Tenant: {{ structure_tenant.name }}</p>
+    </div>
+    <a href="{% url 'hierarchy:delegation_template_list' %}" class="d365-btn">{% trans "Back to list" %}</a>
+  </div>
+
+  <form method="post" class="d365-form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="d365-form-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+    {% for field in form %}
+      <div class="d365-field{% if field.errors %} d365-field--error{% endif %}">
+        <label for="{{ field.id_for_label }}" class="d365-label">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<p class="d365-help">{{ field.help_text }}</p>{% endif %}
+        {% for err in field.errors %}<p class="d365-field-error">{{ err }}</p>{% endfor %}
+      </div>
+    {% endfor %}
+    <div class="d365-form-actions">
+      <button type="submit" class="d365-btn d365-btn--primary">{% if is_edit %}Save{% else %}Create{% endif %}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

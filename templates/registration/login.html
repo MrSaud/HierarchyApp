@@ -1,12 +1,13 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}Sign in{% endblock %}
+{% block title %}{% trans "Sign in" %}{% endblock %}
 
 {% block content %}
 <div class="d365-main--narrow">
   <div class="d365-card d365-card--auth">
-    <h1>Sign in</h1>
-    <p class="d365-card__lead">Use your account to access Hierarchy.</p>
+    <h1>{% trans "Sign in" %}</h1>
+    <p class="d365-card__lead">{% trans "Use your account to access Hierarchy." %}</p>
 
     {% if form.non_field_errors %}
       <div class="d365-alert d365-alert--error" role="alert">
@@ -39,7 +40,7 @@
       </div>
 
       <div class="d365-form__actions">
-        <button type="submit" class="d365-btn d365-btn--primary">Sign in</button>
+        <button type="submit" class="d365-btn d365-btn--primary">{% trans "Sign in" %}</button>
       </div>
     </form>
   </div>

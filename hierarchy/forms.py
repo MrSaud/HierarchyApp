@@ -5,13 +5,22 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
 from .models import (
+    Delegation,
+    DelegationTemplate,
     Employee,
+    OrgUnitType,
+    OrgUnitTypeDefinition,
     OrganizationalUnit,
     Position,
     PositionAssignment,
     SignatureImage,
     Tenant,
 )
+from .org_unit_types import (
+    unit_type_choices_for_tenant,
+    validate_org_unit_parent_type,
+)
+from .organization_structure import assignment_is_current
 from .user_tenant import get_user_tenant_id
 
 MAX_SIGNATURE_IMAGES = 25
@@ -254,12 +263,10 @@ class TenantForm(forms.ModelForm):
 
     class Meta:
         model = Tenant
-        fields = ("name", "slug", "api_base_url", "api_key", "api_key_header", "is_active")
+        fields = ("name", "slug", "api_base_url", "is_active")
         help_texts = {
             "slug": "URL-safe identifier for APIs (e.g. acme-corp). Leave blank to auto-generate from name.",
             "api_base_url": "Tenant-specific API host (scheme + host + port). Example: http://63.183.213.237:1113",
-            "api_key": "Shared secret for API clients (optional if you use env TENANT_API_KEY_<pk> or global Bearer token only).",
-            "api_key_header": "Header name for the key (leave blank for X-Api-Key).",
         }
 
     def __init__(self, *args, **kwargs):
@@ -270,10 +277,6 @@ class TenantForm(forms.ModelForm):
         self.fields["slug"].required = False
         self.fields["api_base_url"].widget.attrs.setdefault("class", inp)
         self.fields["api_base_url"].required = False
-        self.fields["api_key"].widget.attrs.setdefault("class", inp)
-        self.fields["api_key"].required = False
-        self.fields["api_key_header"].widget.attrs.setdefault("class", inp)
-        self.fields["api_key_header"].required = False
 
     def clean(self):
         from django.utils.text import slugify
@@ -309,6 +312,22 @@ class TenantForm(forms.ModelForm):
         return cleaned
 
 
+class TenantApiHeaderForm(forms.Form):
+    """HTTP header name for this tenant's API key (default X-Api-Key)."""
+
+    api_key_header = forms.CharField(
+        max_length=64,
+        required=False,
+        label="API key header",
+        help_text="Leave blank to use X-Api-Key.",
+    )
+
+    def __init__(self, *args, initial_header: str = "", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["api_key_header"].initial = initial_header
+        self.fields["api_key_header"].widget.attrs.setdefault("class", "d365-input")
+
+
 class SignatureImageMetaForm(forms.ModelForm):
     class Meta:
         model = SignatureImage
@@ -322,12 +341,58 @@ class SignatureImageMetaForm(forms.ModelForm):
         self.fields["label"].required = False
 
 
+class OrgUnitTypeDefinitionForm(forms.ModelForm):
+    """Tenant catalog entry for organizational unit types."""
+
+    class Meta:
+        model = OrgUnitTypeDefinition
+        fields = ("slug", "label", "rank", "allows_root", "sort_order")
+
+    def __init__(self, *args, tenant=None, **kwargs):
+        self._tenant = tenant
+        super().__init__(*args, **kwargs)
+        inp = "d365-input"
+        for name in ("slug", "label", "rank", "sort_order"):
+            self.fields[name].widget.attrs.setdefault("class", inp)
+        self.fields["allows_root"].widget.attrs.setdefault("class", "d365-checkbox")
+        self.fields["rank"].help_text = (
+            "Lower number = higher in hierarchy. Parent types must have a lower rank than children."
+        )
+        self.fields["allows_root"].help_text = (
+            "Allow units of this type at the top of the tree (no parent)."
+        )
+        if self.instance.pk:
+            self.fields["slug"].disabled = True
+            self.fields["slug"].help_text = "Slug cannot be changed after creation."
+
+    def clean_slug(self):
+        if self.instance.pk:
+            return self.instance.slug
+        slug = (self.cleaned_data.get("slug") or "").strip().lower()
+        if not slug:
+            raise ValidationError("Slug is required.")
+        qs = OrgUnitTypeDefinition.objects.filter(tenant=self._tenant, slug=slug)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise ValidationError("This slug is already used for another type in this tenant.")
+        return slug
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        if self._tenant is not None:
+            obj.tenant = self._tenant
+        if commit:
+            obj.save()
+        return obj
+
+
 class OrganizationalUnitForm(forms.ModelForm):
     """Department / division tree node inside one tenant."""
 
     class Meta:
         model = OrganizationalUnit
-        fields = ("parent", "name", "code", "sort_order")
+        fields = ("parent", "name", "code", "unit_type", "sort_order")
 
     def __init__(self, *args, tenant=None, **kwargs):
         self._tenant = tenant
@@ -336,6 +401,43 @@ class OrganizationalUnitForm(forms.ModelForm):
         for name in ("name", "code", "sort_order"):
             self.fields[name].widget.attrs.setdefault("class", inp)
         self.fields["parent"].widget.attrs.setdefault("class", "d365-select")
+
+        old_ut = self.fields.pop("unit_type")
+        if tenant is not None:
+            choices = unit_type_choices_for_tenant(tenant.pk)
+            extra_help = ""
+            if not choices:
+                extra_help = (
+                    " No unit types defined yet. Add types under Organization → Unit types."
+                )
+            initial_ut = self.initial.get("unit_type")
+            if initial_ut is None:
+                if self.instance.pk:
+                    initial_ut = self.instance.unit_type
+                else:
+                    initial_ut = OrgUnitType.DEPARTMENT
+            if choices and initial_ut not in dict(choices):
+                initial_ut = choices[0][0]
+            self.fields["unit_type"] = forms.ChoiceField(
+                label=old_ut.label,
+                choices=choices,
+                required=True,
+                initial=initial_ut,
+                help_text=(old_ut.help_text or "") + extra_help,
+                widget=forms.Select(attrs={"class": "d365-select"}),
+            )
+        else:
+            self.fields["unit_type"] = forms.ChoiceField(
+                label=old_ut.label,
+                choices=[],
+                required=False,
+                initial=self.initial.get(
+                    "unit_type",
+                    self.instance.unit_type if self.instance.pk else "",
+                ),
+                help_text=old_ut.help_text,
+                widget=forms.Select(attrs={"class": "d365-select"}),
+            )
         self.fields["sort_order"].required = False
         if tenant is not None:
             qs = OrganizationalUnit.objects.filter(tenant=tenant).order_by(
@@ -354,9 +456,12 @@ class OrganizationalUnitForm(forms.ModelForm):
             self.instance.tenant = self._tenant
         cleaned = super().clean()
         parent = cleaned.get("parent")
-        if parent is not None and self._tenant is not None:
-            if parent.tenant_id != self._tenant.pk:
-                raise ValidationError({"parent": "Parent must belong to this tenant."})
+        try:
+            validate_org_unit_parent_type(self.instance, parent)
+        except ValidationError as exc:
+            if hasattr(exc, "message_dict"):
+                raise ValidationError(exc.message_dict) from exc
+            raise
         return cleaned
 
     def save(self, commit=True):
@@ -455,6 +560,11 @@ class PositionAssignmentForm(forms.ModelForm):
         else:
             self.fields["employee"].queryset = Employee.objects.none()
 
+    def clean(self):
+        if self._position is not None:
+            self.instance.position = self._position
+        return super().clean()
+
     def save(self, commit=True):
         obj = super().save(commit=False)
         if self._position is not None:
@@ -514,4 +624,178 @@ class EmployeePositionAssignmentForm(forms.ModelForm):
             obj.employee = self._employee
         if commit:
             obj.save()
+        return obj
+
+
+def _employee_choice_label(employee: Employee) -> str:
+    name = employee.user.get_full_name().strip()
+    if name:
+        return f"{name} ({employee.user.username})"
+    return employee.user.username
+
+
+class DelegationForm(forms.ModelForm):
+    """Delegate authority from one employee to another for a date range."""
+
+    starting_template = forms.ModelChoiceField(
+        label="Start from template",
+        required=False,
+        help_text="Optional. Applies default end date (if configured) and checks delegatee eligibility.",
+        queryset=DelegationTemplate.objects.none(),
+    )
+
+    class Meta:
+        model = Delegation
+        fields = (
+            "delegator",
+            "delegatee",
+            "start_date",
+            "end_date",
+            "is_full_substitute",
+            "notes",
+        )
+
+    def __init__(self, *args, tenant=None, **kwargs):
+        self._tenant = tenant
+        super().__init__(*args, **kwargs)
+        inp = "d365-input"
+        self.fields["delegator"].widget.attrs.setdefault("class", "d365-select")
+        self.fields["delegatee"].widget.attrs.setdefault("class", "d365-select")
+        self.fields["notes"].widget.attrs.setdefault("class", inp)
+        self.fields["is_full_substitute"].widget.attrs.setdefault("class", "d365-checkbox")
+        self.fields["is_full_substitute"].help_text = (
+            "Unchecked means partial / limited delegation; another full substitute may overlap the same period."
+        )
+        for name in ("start_date", "end_date"):
+            self.fields[name].widget = forms.DateInput(attrs={"type": "date", "class": inp})
+        self.fields["notes"].required = False
+        self.fields["end_date"].required = False
+        if tenant is not None:
+            qs = Employee.objects.filter(tenant_id=tenant.pk).select_related("user").order_by(
+                "user__last_name",
+                "user__first_name",
+                "user__username",
+            )
+            self.fields["delegator"].queryset = qs
+            self.fields["delegatee"].queryset = qs
+            tpl_qs = DelegationTemplate.objects.filter(tenant=tenant).order_by(
+                "sort_order",
+                "name",
+            )
+            self.fields["starting_template"].queryset = tpl_qs
+            label = _employee_choice_label
+            self.fields["delegator"].label_from_instance = label
+            self.fields["delegatee"].label_from_instance = label
+        else:
+            self.fields["delegator"].queryset = Employee.objects.none()
+            self.fields["delegatee"].queryset = Employee.objects.none()
+        if self.instance.pk:
+            del self.fields["starting_template"]
+            if self.instance.template_id:
+                self.fields["notes"].help_text = (
+                    (self.fields["notes"].help_text or "")
+                    + f" Created from template: {self.instance.template.name}."
+                ).strip()
+
+    def clean(self):
+        from datetime import timedelta
+
+        cleaned = super().clean()
+        if self._tenant is not None:
+            self.instance.tenant = self._tenant
+        delegator = cleaned.get("delegator")
+        delegatee = cleaned.get("delegatee")
+        if delegator is not None and delegatee is not None and delegator.pk == delegatee.pk:
+            raise ValidationError({"delegatee": "Delegator and delegatee must be different people."})
+
+        tpl = cleaned.get("starting_template") if "starting_template" in cleaned else None
+        start = cleaned.get("start_date")
+        end = cleaned.get("end_date")
+        if tpl and start:
+            if tpl.default_duration_days and not end:
+                cleaned["end_date"] = start + timedelta(days=tpl.default_duration_days)
+            cleaned["is_full_substitute"] = tpl.default_is_full_substitute
+
+        if tpl and delegatee and not self.instance.pk:
+            pos_ids = list(
+                tpl.eligible_delegatee_positions.filter(tenant_id=self._tenant.pk).values_list(
+                    "pk",
+                    flat=True,
+                ),
+            )
+            if pos_ids:
+                ok = False
+                for a in delegatee.position_assignments.filter(position_id__in=pos_ids):
+                    if assignment_is_current(a):
+                        ok = True
+                        break
+                if not ok:
+                    raise ValidationError(
+                        {
+                            "delegatee": (
+                                "This template requires the delegatee to currently hold one of the "
+                                "configured positions. Choose another delegatee or a different template."
+                            ),
+                        },
+                    )
+        return cleaned
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        if self._tenant is not None:
+            obj.tenant = self._tenant
+        tpl = self.cleaned_data.get("starting_template") if "starting_template" in self.cleaned_data else None
+        if tpl and not obj.pk:
+            obj.template = tpl
+        if commit:
+            obj.save()
+        return obj
+
+
+class DelegationTemplateForm(forms.ModelForm):
+    class Meta:
+        model = DelegationTemplate
+        fields = (
+            "name",
+            "description",
+            "default_duration_days",
+            "default_is_full_substitute",
+            "eligible_delegatee_positions",
+            "sort_order",
+        )
+
+    def __init__(self, *args, tenant=None, **kwargs):
+        self._tenant = tenant
+        super().__init__(*args, **kwargs)
+        inp = "d365-input"
+        for name in ("name", "sort_order"):
+            self.fields[name].widget.attrs.setdefault("class", inp)
+        self.fields["description"].widget = forms.Textarea(attrs={"class": inp, "rows": 3})
+        self.fields["default_is_full_substitute"].widget.attrs.setdefault("class", "d365-checkbox")
+        self.fields["eligible_delegatee_positions"].widget = forms.SelectMultiple(
+            attrs={"class": "d365-select", "size": 10},
+        )
+        self.fields["default_duration_days"].widget.attrs.setdefault("class", inp)
+        self.fields["default_duration_days"].required = False
+        self.fields["sort_order"].required = False
+        if tenant is not None:
+            self.fields["eligible_delegatee_positions"].queryset = Position.objects.filter(
+                tenant=tenant,
+            ).order_by("title")
+        else:
+            self.fields["eligible_delegatee_positions"].queryset = Position.objects.none()
+
+    def clean(self):
+        cleaned = super().clean()
+        if self._tenant is not None:
+            self.instance.tenant = self._tenant
+        return cleaned
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        if self._tenant is not None:
+            obj.tenant = self._tenant
+        if commit:
+            obj.save()
+        self.save_m2m()
         return obj

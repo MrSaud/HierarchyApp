@@ -1,14 +1,13 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}Employee photo{% endblock %}
+{% block title %}{% trans "Employee photo" %}{% endblock %}
 
 {% block content %}
 <div class="d365-card">
-  <h1>Employee photo</h1>
-  <p class="d365-card__lead">
-    Your account is not linked to an employee record yet. Employee photos are stored on the employee profile that matches your user.
-    Ask an administrator to create or sync your employee record.
-  </p>
-  <p><a href="{% url 'hierarchy:index' %}" class="d365-link">Back to home</a></p>
+  <h1>{% trans "Employee photo" %}</h1>
+  <p class="d365-card__lead">{% trans "Your account is not linked to an employee record yet. Employee photos are stored on the employee profile that matches your user.
+    Ask an administrator to create or sync your employee record." %}</p>
+  <p><a href="{% url 'hierarchy:index' %}" class="d365-link">{% trans "Back to home" %}</a></p>
 </div>
 {% endblock %}

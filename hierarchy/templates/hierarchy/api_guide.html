@@ -1,60 +1,199 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}API guide{% endblock %}
+{% block title %}{% trans "API guide" %}{% endblock %}
 
 {% block content %}
 <div class="d365-card d365-card--wide">
-  <h1>API guide</h1>
+  <h1>{% trans "API guide" %}</h1>
   <p class="d365-card__subtitle">
-    JSON endpoints served by this site. Base URL: <code class="d365-code">{{ site_api_base }}</code>
+    JSON endpoints <strong>implemented by this Hierarchy app</strong> (routes in
+    <code class="d365-code">hierarchy/urls.py</code> under <code class="d365-code">/api/</code>).
+    Base URL: <code class="d365-code">{{ site_api_base }}</code>
+  </p>
+  <p class="d365-help api-guide-intro">
+    Integrations should call <strong>versioned</strong>
+    <code class="d365-code">/api/v1/…</code> reads for stable JSON, weak
+    <code class="d365-code">ETag</code> / <code class="d365-code">If-None-Match</code> (304),
+    and bulk <code class="d365-code">PATCH</code> with <code class="d365-code">If-Match</code> (412 when stale).
+    Legacy <code class="d365-code">/api/organization/units/</code> and
+    <code class="d365-code">/api/employees/</code> remain available unchanged.
+    Machine clients need a per-tenant API key (see <strong>Administration → API access</strong>).
+    This page does <strong>not</strong> document external tenant backends
+    (<code class="d365-code">GET /api/auth/users</code> for user sync,
+    <code class="d365-code">GET /api/health</code> on a tenant’s
+    <code class="d365-code">api_base_url</code>). Use
+    <a href="{% url 'hierarchy:user_sync' %}">{% trans "Sync users" %}</a> and
+    <a href="{% url 'hierarchy:api_health_test' %}">{% trans "API health" %}</a> for those.
+    Organization assignment board JSON under <code class="d365-code">/organization/</code>
+    is staff UI only and is not listed here.
   </p>
 
-  <section class="api-guide-section">
-    <h2><code class="d365-code">POST /api/auth/users/</code></h2>
-    <p class="d365-help">Create a user and employee profile. Body: JSON. CSRF exempt.</p>
-    <ul class="d365-help">
-      <li><strong>Required fields:</strong> <code class="d365-code">samAccountName</code>, <code class="d365-code">password</code>, <code class="d365-code">givenName</code>, <code class="d365-code">surname</code>, <code class="d365-code">tenant</code> (tenant slug).</li>
-      <li><strong>Responses:</strong> <strong>201</strong> created; <strong>400</strong> validation / bad tenant; <strong>409</strong> username exists.</li>
-    </ul>
-    <pre class="d365-pre">curl -sS -X POST "{{ site_api_base }}/api/auth/users/" \
-  -H "Content-Type: application/json" \
-  -d '{"samAccountName":"jdoe","password":"SecurePass1!","givenName":"Jane","surname":"Doe","tenant":"default"}'</pre>
+  <section class="api-guide-section api-guide-section--toc" id="api-overview">
+    <h2>{% trans "Endpoints" %}</h2>
+    <table class="d365-table d365-table--compact api-guide-toc">
+      <thead>
+        <tr>
+          <th scope="col">Method</th>
+          <th scope="col">Path</th>
+          <th scope="col">Purpose</th>
+          <th scope="col">Auth</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in app_api_endpoint_index %}
+        <tr>
+          <td>
+            <span class="api-guide-method api-guide-method--{{ row.method|lower }}">{{ row.method }}</span>
+          </td>
+          <td><a href="#api-{{ row.id }}"><code class="d365-code">{{ row.path }}</code></a></td>
+          <td>{{ row.title }}</td>
+          <td>{{ row.auth_label }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="d365-help api-guide-toc-extra">
+      <a href="#api-response-conventions">{% trans "Response conventions" %}</a>
+      — employee identity fields in JSON, versioned GET headers, bulk PATCH preconditions, assignment snapshot columns.
+    </p>
   </section>
 
-  <section class="api-guide-section">
-    <h2><code class="d365-code">POST /api/auth/login/</code></h2>
-    <p class="d365-help">Login with JSON; response sets a session cookie (<code class="d365-code">sessionid</code>). CSRF exempt.</p>
+  <section class="api-guide-section" id="api-authentication">
+    <h2>{% trans "Authentication" %}</h2>
+    <p class="d365-help">
+      Protected endpoints accept <strong>any one</strong> of the following. The target
+      <code class="d365-code">tenant_id</code> (or <code class="d365-code">tenant</code> slug on
+      create-user) must match the credential’s tenant unless you are a superuser staff session.
+    </p>
     <ul class="d365-help">
-      <li><strong>Body:</strong> <code class="d365-code">username</code>, <code class="d365-code">password</code>.</li>
-      <li><strong>Responses:</strong> <strong>200</strong> ok; <strong>401</strong> bad credentials; <strong>403</strong> disabled.</li>
+      <li>
+        <strong>Tenant API key</strong> — header
+        <code class="d365-code">X-Api-Key</code> by default (configurable per tenant on
+        <a href="{% url 'hierarchy:tenant_api_access' %}">{% trans "API access" %}</a>).
+        Required for unattended integrations.
+      </li>
+      <li>
+        <strong>Global Bearer</strong> —
+        <code class="d365-code">Authorization: Bearer &lt;token&gt;</code> using
+        <code class="d365-code">EMPLOYEE_API_TOKEN</code>
+        ({% if employee_api_token_configured %}configured on server{% else %}not set — optional env override{% endif %}).
+      </li>
+      <li>
+        <strong>Staff session</strong> — cookie from
+        <code class="d365-code">POST /api/auth/login/</code> or the web UI; staff must belong to
+        the same tenant (superusers may access any active tenant).
+      </li>
     </ul>
-    <pre class="d365-pre">curl -sS -c cookies.txt -X POST "{{ site_api_base }}/api/auth/login/" \
-  -H "Content-Type: application/json" \
-  -d '{"username":"jdoe","password":"SecurePass1!"}'</pre>
+    <p class="d365-help api-guide-note">
+      <code class="d365-code">POST /api/auth/login/</code> itself does not require an API key;
+      it returns a session for browser or staff API use.
+    </p>
   </section>
 
-  <section class="api-guide-section">
-    <h2><code class="d365-code">GET /api/employees/</code></h2>
-    <p class="d365-help">One employee plus signature images (Base64). Query string only.</p>
+  <section class="api-guide-section" id="api-response-conventions">
+    <h2>{% trans "Response conventions" %}</h2>
     <ul class="d365-help">
-      <li><strong>Query:</strong> <code class="d365-code">tenant_id</code> (required) and exactly one of <code class="d365-code">user_id</code>, <code class="d365-code">username</code>, <code class="d365-code">civil_id</code>.</li>
-      <li><strong>Auth (any one):</strong> <code class="d365-code">Authorization: Bearer</code> token ({% if employee_api_token_configured %}set on server{% else %}optional / may be unset{% endif %}); or tenant API key header (default <code class="d365-code">X-Api-Key</code>, configurable per tenant); or staff session cookie.</li>
-      <li><strong>Typical errors:</strong> <strong>400</strong> bad query; <strong>401</strong> / <strong>403</strong>; <strong>404</strong> not found; <strong>409</strong> duplicate <code class="d365-code">civil_id</code>.</li>
+      <li>
+        <strong>Employee identity</strong> — Nested person objects (delegations, reports-to, assignment snapshots)
+        include <code class="d365-code">user_id</code>, <code class="d365-code">username</code>,
+        <code class="d365-code">civil_id</code>, and <code class="d365-code">employee_number</code>
+        (strings; empty when not set). Full employee GET also returns these at the top level.
+      </li>
+      <li>
+        <strong>Auth user payloads</strong> —
+        <code class="d365-code">POST /api/auth/login/</code> includes
+        <code class="d365-code">civil_id</code> and <code class="d365-code">employee_number</code>
+        when a linked employee exists.
+        <code class="d365-code">POST /api/auth/users/</code> returns both fields on create (often empty until edited).
+      </li>
+      <li>
+        <strong>Versioned GET (<code class="d365-code">/api/v1/…</code>)</strong> — Successful reads include
+        weak <code class="d365-code">ETag</code>,
+        <code class="d365-code">X-API-Version: 1</code>,
+        <code class="d365-code">X-API-Read-Contract</code> (stable payload name),
+        and <code class="d365-code">Link</code> to this guide. Send
+        <code class="d365-code">If-None-Match</code> to receive <strong>304</strong> when unchanged.
+      </li>
+      <li>
+        <strong>Bulk PATCH</strong> — Requires <code class="d365-code">If-Match</code> from the matching v1 GET snapshot;
+        missing header → <strong>428</strong>, stale tag → <strong>412</strong>. Successful writes return a new
+        <code class="d365-code">ETag</code>. Unit bulk locks against
+        <code class="d365-code">GET …/units/?format=flat</code> only.
+      </li>
+      <li>
+        <strong>Assignments snapshot</strong> — Each row includes
+        <code class="d365-code">employee_id</code>,
+        <code class="d365-code">user_id</code>,
+        <code class="d365-code">username</code>,
+        <code class="d365-code">civil_id</code>,
+        <code class="d365-code">employee_number</code>,
+        position and date fields. Changing this shape changes ETags — refetch before bulk PATCH after upgrades.
+      </li>
     </ul>
-    <pre class="d365-pre">curl -sS "{{ site_api_base }}/api/employees/?tenant_id=1&amp;username=jdoe" \
-  -H "X-Api-Key: &lt;secret&gt;"</pre>
   </section>
 
-  <section class="api-guide-section">
-    <h2>Auth notes (<code class="d365-code">GET /api/employees/</code>)</h2>
+  {% for ep in app_api_endpoints %}
+  <section class="api-guide-section" id="api-{{ ep.id }}">
+    <h2>
+      <span class="api-guide-method api-guide-method--{{ ep.method|lower }}">{{ ep.method }}</span>
+      <code class="d365-code">{{ ep.path }}</code>
+      <span class="api-guide-ep-title">{{ ep.title }}</span>
+    </h2>
+    <p class="d365-help">{{ ep.summary|safe }}</p>
+
+    {% if ep.request_fields %}
+    <h3 class="api-guide-h3">{% trans "Request" %}</h3>
+    <table class="d365-table d365-table--compact api-guide-table">
+      <thead>
+        <tr>
+          <th scope="col">Field</th>
+          <th scope="col">Type</th>
+          <th scope="col">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, typ, notes in ep.request_fields %}
+        <tr>
+          <td><code class="d365-code">{{ name }}</code></td>
+          <td>{{ typ }}</td>
+          <td>{{ notes }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if ep.responses %}
+    <h3 class="api-guide-h3">{% trans "Responses" %}</h3>
     <ul class="d365-help">
-      <li>Bearer secret: environment <code class="d365-code">EMPLOYEE_API_TOKEN</code>.</li>
-      <li>Tenant key: tenant settings or <code class="d365-code">TENANT_API_KEY_&lt;tenant_id&gt;</code>; header name: tenant settings or <code class="d365-code">TENANT_API_KEY_HEADER_&lt;tenant_id&gt;</code> (default header <code class="d365-code">X-Api-Key</code>).</li>
+      {% for code, desc in ep.responses %}
+      <li><strong>{{ code }}</strong> — {{ desc }}</li>
+      {% endfor %}
     </ul>
+    {% endif %}
+
+    {% if ep.response_examples %}
+    <h3 class="api-guide-h3">{% trans "Response JSON" %}</h3>
+    {% for label, body in ep.response_examples %}
+    <p class="d365-help api-guide-response-label"><strong>{{ label }}</strong></p>
+    <pre class="d365-pre api-guide-response">{{ body }}</pre>
+    {% endfor %}
+    {% endif %}
+
+    {% if ep.note %}
+    <p class="d365-help api-guide-note">{{ ep.note|safe }}</p>
+    {% endif %}
+
+    <h3 class="api-guide-h3">{% trans "Example request" %}</h3>
+    <pre class="d365-pre">{{ ep.curl }}</pre>
   </section>
+  {% endfor %}
 
   <div class="d365-form__actions">
-    <a href="{% url 'hierarchy:index' %}" class="d365-link d365-link--standalone">Home</a>
+    <a href="{% url 'hierarchy:tenant_api_access' %}" class="d365-link">{% trans "API access (tokens)" %}</a>
+    <a href="{% url 'hierarchy:api_health_test' %}" class="d365-link">{% trans "API health (external)" %}</a>
+    <a href="{% url 'hierarchy:index' %}" class="d365-link d365-link--standalone">{% trans "Home" %}</a>
   </div>
 </div>
 {% endblock %}

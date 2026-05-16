@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Delegations" %}{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide d365-card--table-card">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>{% trans "Delegations" %}</h1>
+      {% if structure_tenant %}
+      <p class="d365-card__subtitle">
+        Tenant: <strong>{{ structure_tenant.name }}</strong> —
+        who may act on behalf of whom, and for which period.
+      </p>
+      {% else %}
+      <p class="d365-card__subtitle">Temporary authority between employees.</p>
+      {% endif %}
+    </div>
+    {% if structure_tenant %}
+    <div class="d365-card__actions">
+      <a href="{% url 'hierarchy:delegation_template_list' %}" class="d365-btn">{% trans "Templates" %}</a>
+      <a href="{% url 'hierarchy:employee_list' %}" class="d365-btn">{% trans "Employees" %}</a>
+      <a href="{% url 'hierarchy:delegation_create' %}" class="d365-btn d365-btn--primary">{% trans "New delegation" %}</a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not structure_tenant %}
+    <p class="d365-help">Superusers: pick <strong>Scope</strong> in the app bar. Tenant staff: uses your employee tenant automatically.</p>
+  {% elif not delegations %}
+    <p class="d365-empty">No delegations yet. <a href="{% url 'hierarchy:delegation_create' %}">{% trans "Create one" %}</a>.</p>
+  {% else %}
+    <div class="d365-table-wrap">
+      <table class="d365-table">
+        <thead>
+          <tr>
+            <th scope="col">Delegator</th>
+            <th scope="col">Delegatee</th>
+            <th scope="col">Period</th>
+            <th scope="col">Scope</th>
+            <th scope="col">Status</th>
+            <th scope="col">Notes</th>
+            <th scope="col"><span class="d365-visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in delegations %}
+            {% with d=row.obj %}
+            <tr>
+              <td>{{ d.delegator.user.get_full_name|default:d.delegator.user.username }}</td>
+              <td>{{ d.delegatee.user.get_full_name|default:d.delegatee.user.username }}</td>
+              <td>
+                {{ d.start_date }}
+                —
+                {% if d.end_date %}{{ d.end_date }}{% else %}open{% endif %}
+              </td>
+              <td>
+                {% if d.is_full_substitute %}
+                  <span class="d365-pill">Full</span>
+                {% else %}
+                  <span class="d365-pill d365-pill--muted">Partial</span>
+                {% endif %}
+                {% if d.template %}<br><span class="d365-muted" title="Template">{{ d.template.name }}</span>{% endif %}
+              </td>
+              <td>
+                {% if row.status == "Active" %}
+                  <span class="d365-pill">{{ row.status }}</span>
+                {% else %}
+                  <span class="d365-pill d365-pill--muted">{{ row.status }}</span>
+                {% endif %}
+              </td>
+              <td class="d365-muted">{{ d.notes|default:"—"|truncatewords:12 }}</td>
+              <td class="d365-table__actions">
+                <a href="{% url 'hierarchy:delegation_edit' d.pk %}" class="d365-link">{% trans "Edit" %}</a>
+                <form method="post" action="{% url 'hierarchy:delegation_delete' d.pk %}" class="d365-inline-form" onsubmit="return confirm('Remove this delegation?');">
+                  {% csrf_token %}
+                  <button type="submit" class="d365-link d365-link--danger">{% trans "Remove" %}</button>
+                </form>
+              </td>
+            </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

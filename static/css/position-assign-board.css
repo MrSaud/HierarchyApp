@@ -1,0 +1,240 @@
+/* Position assignment drag-and-drop board */
+
+.d365-assign-board__layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+  margin-top: 20px;
+}
+
+@media (max-width: 960px) {
+  .d365-assign-board__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.d365-assign-board__panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.d365-assign-board__positions {
+  max-height: min(70vh, 640px);
+  overflow: auto;
+  padding-right: 8px;
+  border-right: 1px solid var(--d365-border);
+}
+
+.d365-assign-board__position-list {
+  margin-top: 8px;
+}
+
+.d365-assign-board__ou-group {
+  margin-bottom: 16px;
+}
+
+.d365-assign-board__ou-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--d365-text-secondary);
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.d365-assign-board__ou-positions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.d365-assign-board__ou-positions li {
+  margin-bottom: 4px;
+}
+
+.d365-assign-board__position-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  line-height: 1.35;
+}
+
+.d365-assign-board__position-btn:hover {
+  background: #f3f2f1;
+}
+
+.d365-assign-board__position-btn.is-selected {
+  background: #deecf9;
+  border-color: #0078d4;
+  font-weight: 600;
+}
+
+.d365-assign-board__position-title {
+  display: inline;
+}
+
+.d365-assign-board__search-wrap {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.d365-assign-board__search-wrap .d365-label {
+  margin-bottom: 4px;
+}
+
+.d365-assign-board__dropzone {
+  min-height: 280px;
+  padding: 12px;
+  border: 2px dashed var(--d365-border);
+  border-radius: 6px;
+  background: #faf9f8;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.d365-assign-board__dropzone--target {
+  background: #f8fbfd;
+  border-color: #c7e0f4;
+}
+
+.d365-assign-board__dropzone--disabled {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.d365-assign-board__dropzone.is-drag-over {
+  border-color: #0078d4;
+  background: #eff6fc;
+}
+
+.d365-assign-board__zone-hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--d365-text-secondary);
+  font-style: italic;
+}
+
+.d365-assign-board__zone-hint[hidden] {
+  display: none;
+}
+
+.d365-assign-board__chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.d365-assign-board__chips[hidden] {
+  display: none;
+}
+
+.d365-assign-board__chip {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  padding: 6px 8px 6px 12px;
+  background: #fff;
+  border: 1px solid var(--d365-border);
+  border-radius: 20px;
+  font-size: 14px;
+  cursor: grab;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  max-width: 100%;
+}
+
+.d365-assign-board__chip-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.d365-assign-board__chip-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.d365-assign-board__chip-btn {
+  padding: 2px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.d365-assign-board__chip-btn--remove {
+  color: #a4262c;
+  border-color: #e8b4b8;
+}
+
+.d365-assign-board__chip-btn--remove:hover {
+  background: #fde7e9;
+}
+
+.d365-assign-board__chip:active {
+  cursor: grabbing;
+}
+
+.d365-assign-board__chip.is-dragging {
+  opacity: 0.45;
+}
+
+.d365-assign-board__chip-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #e8f4ea;
+  color: #107c10;
+}
+
+.d365-assign-board__chip-badge--secondary {
+  background: #edebe9;
+  color: #605e5c;
+}
+
+.d365-assign-board__primary-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.d365-assign-board__primary-opt input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.d365-assign-board__primary-hint {
+  margin: 0 0 10px;
+}
+
+.d365-assign-board__target-name {
+  color: #0078d4;
+}
+
+.d365-assign-board__status {
+  margin-top: 12px;
+  font-size: 13px;
+  min-height: 1.25em;
+  color: var(--d365-text-secondary);
+}
+
+.d365-assign-board__status--error {
+  color: #a4262c;
+}

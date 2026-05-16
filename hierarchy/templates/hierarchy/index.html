@@ -1,19 +1,135 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}Home{% endblock %}
+{% block title %}{% trans "Home" %}{% endblock %}
 
 {% block content %}
-<div class="d365-card">
-  <h1>Welcome</h1>
-  <p>Hierarchy app — tenant-scoped employees and profiles.</p>
-  {% if user.is_authenticated %}
-  <ul class="d365-help d365-home-quicklinks">
-    <li><a href="{% url 'hierarchy:employee_photo' %}">Employee photo</a> — your picture in the app</li>
-    {% if user.is_staff %}
-    <li><a href="{% url 'hierarchy:organization_overview' %}">Organization structure</a> — units, positions, assignments</li>
-    <li><a href="{% url 'hierarchy:employee_list' %}">Employees</a> — directory table</li>
+<div class="d365-hub">
+  <div class="d365-card d365-card--wide d365-hub__hero">
+    <div class="d365-hub__hero-text">
+      <h1>{% trans "Organization hub" %}</h1>
+      {% if user.is_authenticated and user.is_staff and hub_tenant %}
+      <p class="d365-card__lead">
+        {% trans "Canonical people and structure for" %} <strong>{{ hub_tenant.name }}</strong>.
+        {% trans "Use search, structure, and assignments to keep this tenant current." %}
+      </p>
+      {% elif user.is_authenticated and user.is_staff and staff_needs_employee_profile %}
+      <p class="d365-card__lead">
+        {% trans "Ask an administrator to link your user account to an employee profile for your organization. Until then, directory and structure tools stay unavailable." %}
+      </p>
+      {% elif user.is_authenticated and user.is_staff %}
+      <p class="d365-card__lead">
+        {% trans "Pick a" %} <strong>{% trans "Scope" %}</strong>
+        {% trans "in the app bar to see live counts and shortcuts for one tenant, or use the menu to work across tenants." %}
+      </p>
+      {% elif user.is_authenticated %}
+      <p class="d365-card__lead">{% trans "Your profile and photo live here; administrators maintain the official org structure." %}</p>
+      {% else %}
+      <p class="d365-card__lead">{% trans "Sign in to open your workspace." %}</p>
+      {% endif %}
+    </div>
+    {% if user.is_authenticated and user.is_staff and hub_tenant and hub_stats %}
+    <form method="get" action="{% url 'hierarchy:hub_search' %}" class="d365-hub__search" role="search">
+      <label class="d365-label" for="id-hub-home-search">{% trans "Search this tenant" %}</label>
+      <div class="d365-hub__search-row">
+        <input
+          type="search"
+          id="id-hub-home-search"
+          name="q"
+          class="d365-input d365-hub__search-input"
+          placeholder="{% trans 'Name, unit, position, job title…' %}"
+          minlength="2"
+          autocomplete="off"
+        >
+        <button type="submit" class="d365-btn d365-btn--primary">{% trans "Search" %}</button>
+      </div>
+      <p class="d365-help">{% trans "Matches people, organizational units, and positions (at least 2 characters)." %}</p>
+    </form>
     {% endif %}
-  </ul>
+  </div>
+
+  {% if user.is_authenticated and user.is_staff and hub_tenant and hub_stats %}
+  <section class="d365-hub__stats" aria-label="{% trans 'Tenant snapshot' %}">
+    <a href="{% url 'hierarchy:employee_list' %}" class="d365-hub-stat">
+      <span class="d365-hub-stat__value">{{ hub_stats.employees }}</span>
+      <span class="d365-hub-stat__label">{% trans "Employees" %}</span>
+    </a>
+    <a href="{% url 'hierarchy:org_unit_list' %}" class="d365-hub-stat">
+      <span class="d365-hub-stat__value">{{ hub_stats.units }}</span>
+      <span class="d365-hub-stat__label">{% trans "Units" %}</span>
+    </a>
+    <a href="{% url 'hierarchy:position_list' %}" class="d365-hub-stat">
+      <span class="d365-hub-stat__value">{{ hub_stats.positions }}</span>
+      <span class="d365-hub-stat__label">{% trans "Positions" %}</span>
+    </a>
+    <a href="{% url 'hierarchy:position_assign_board' %}" class="d365-hub-stat">
+      <span class="d365-hub-stat__value">{{ hub_stats.assignments }}</span>
+      <span class="d365-hub-stat__label">{% trans "Assignments" %}</span>
+    </a>
+    <a href="{% url 'hierarchy:delegation_list' %}" class="d365-hub-stat">
+      <span class="d365-hub-stat__value">{{ hub_stats.delegations }}</span>
+      <span class="d365-hub-stat__label">{% trans "Delegations" %}</span>
+    </a>
+    <a href="{% url 'hierarchy:organization_overview' %}" class="d365-hub-stat">
+      <span class="d365-hub-stat__value d365-hub-stat__value--symbol" aria-hidden="true">◇</span>
+      <span class="d365-hub-stat__label">{% trans "Org chart" %}</span>
+    </a>
+  </section>
+
+  <div class="d365-hub__grid">
+    <div class="d365-card d365-hub-panel">
+      <h2 class="d365-hub-panel__title">{% trans "People" %}</h2>
+      <ul class="d365-hub-panel__list">
+        <li><a href="{% url 'hierarchy:employee_list' %}">{% trans "Employee directory" %}</a></li>
+        <li><a href="{% url 'hierarchy:employee_create' %}">{% trans "Create employee" %}</a></li>
+        <li><a href="{% url 'hierarchy:position_assign_board' %}">{% trans "Assign to positions" %}</a></li>
+      </ul>
+    </div>
+    <div class="d365-card d365-hub-panel">
+      <h2 class="d365-hub-panel__title">{% trans "Structure" %}</h2>
+      <ul class="d365-hub-panel__list">
+        <li><a href="{% url 'hierarchy:organization_overview' %}">{% trans "Organization structure" %}</a></li>
+        <li><a href="{% url 'hierarchy:org_unit_list' %}">{% trans "Organizational units" %}</a></li>
+        <li><a href="{% url 'hierarchy:org_unit_type_list' %}">{% trans "Unit types" %}</a></li>
+        <li><a href="{% url 'hierarchy:position_list' %}">{% trans "Positions" %}</a></li>
+      </ul>
+    </div>
+    <div class="d365-card d365-hub-panel">
+      <h2 class="d365-hub-panel__title">{% trans "Authority &amp; audit" %}</h2>
+      <ul class="d365-hub-panel__list">
+        <li><a href="{% url 'hierarchy:delegation_list' %}">{% trans "Delegations" %}</a></li>
+        <li><a href="{% url 'hierarchy:delegation_template_list' %}">{% trans "Delegation templates" %}</a></li>
+        <li><a href="{% url 'hierarchy:audit_log_list' %}">{% trans "Audit log" %}</a></li>
+      </ul>
+    </div>
+    <div class="d365-card d365-hub-panel">
+      <h2 class="d365-hub-panel__title">{% trans "Integrations &amp; data" %}</h2>
+      <ul class="d365-hub-panel__list">
+        <li><a href="{% url 'hierarchy:api_guide' %}">{% trans "API guide" %}</a></li>
+        <li><a href="{% url 'hierarchy:tenant_api_access' %}">{% trans "API access" %}</a></li>
+        <li><a href="{% url 'hierarchy:user_sync' %}">{% trans "Sync users" %}</a></li>
+        <li><a href="{% url 'hierarchy:api_health_test' %}">{% trans "API health" %}</a></li>
+      </ul>
+    </div>
+  </div>
+  {% elif user.is_authenticated and user.is_staff %}
+  <div class="d365-card d365-card--wide">
+    <h2 class="d365-structure-section__title">{% trans "Where to start" %}</h2>
+    <ul class="d365-hub-panel__list">
+      <li><a href="{% url 'hierarchy:tenant_list' %}">{% trans "Tenants" %}</a> — {% trans "open a tenant, then set" %} <strong>{% trans "Scope" %}</strong> {% trans "to work as “source of truth” for that org." %}</li>
+      <li><a href="{% url 'hierarchy:organization_overview' %}">{% trans "Organization" %}</a> — {% trans "structure when scope is set." %}</li>
+      <li><a href="{% url 'hierarchy:employee_list' %}">{% trans "Employees" %}</a> — {% trans "directory across your access." %}</li>
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if user.is_authenticated %}
+  <div class="d365-card d365-card--wide d365-hub__personal">
+    <h2 class="d365-structure-section__title">{% trans "Your profile" %}</h2>
+    <ul class="d365-hub-panel__list">
+      <li><a href="{% url 'hierarchy:employee_photo' %}">{% trans "Employee photo" %}</a> — {% trans "picture shown in the app" %}</li>
+    </ul>
+  </div>
   {% endif %}
 </div>
 {% endblock %}

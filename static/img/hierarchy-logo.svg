@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="hierarchyLogoGrad" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0078d4"/>
+      <stop offset="1" stop-color="#00bcf2"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#hierarchyLogoGrad)"/>
+  <!-- Root → bar → two reports -->
+  <path
+    d="M16 10v5.5M9 17.5h14M9 17.5v8.5M23 17.5v8.5"
+    stroke="#ffffff"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="16" cy="8" r="2.75" fill="#ffffff"/>
+  <circle cx="9" cy="26" r="2.75" fill="#ffffff"/>
+  <circle cx="23" cy="26" r="2.75" fill="#ffffff"/>
+</svg>

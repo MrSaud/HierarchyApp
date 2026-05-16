@@ -1,18 +1,20 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}Positions{% endblock %}
+{% block title %}{% trans "Positions" %}{% endblock %}
 
 {% block content %}
 <div class="d365-card d365-card--wide d365-card--table-card">
   <div class="d365-card__header-row">
     <div>
-      <h1>Positions</h1>
+      <h1>{% trans "Positions" %}</h1>
       {% if structure_tenant %}<p class="d365-card__subtitle">Tenant: {{ structure_tenant.name }}</p>{% endif %}
     </div>
     {% if structure_tenant %}
     <div class="d365-card__actions">
-      <a href="{% url 'hierarchy:organization_overview' %}" class="d365-btn">Overview</a>
-      <a href="{% url 'hierarchy:position_create' %}" class="d365-btn d365-btn--primary">New position</a>
+      <a href="{% url 'hierarchy:organization_overview' %}" class="d365-btn">{% trans "Overview" %}</a>
+      <a href="{% url 'hierarchy:position_assign_board' %}" class="d365-btn">{% trans "Assign people" %}</a>
+      <a href="{% url 'hierarchy:position_create' %}" class="d365-btn d365-btn--primary">{% trans "New position" %}</a>
     </div>
     {% endif %}
   </div>
@@ -20,7 +22,7 @@
   {% if not structure_tenant %}
     <p class="d365-help">Choose a tenant in Scope (superuser) to manage positions.</p>
   {% elif not positions %}
-    <p class="d365-empty">No positions yet. <a href="{% url 'hierarchy:position_create' %}">Create one</a>.</p>
+    <p class="d365-empty">No positions yet. <a href="{% url 'hierarchy:position_create' %}">{% trans "Create one" %}</a>.</p>
   {% else %}
     <div class="d365-table-wrap">
       <table class="d365-table">
@@ -40,7 +42,7 @@
               <td>{{ p.code|default:"—" }}</td>
               <td>{% if p.organizational_unit %}{{ p.organizational_unit.name }}{% else %}—{% endif %}</td>
               <td>{% if p.is_active %}Yes{% else %}No{% endif %}</td>
-              <td class="d365-table__actions"><a href="{% url 'hierarchy:position_edit' p.pk %}" class="d365-link">Edit</a></td>
+              <td class="d365-table__actions"><a href="{% url 'hierarchy:position_edit' p.pk %}" class="d365-link">{% trans "Edit" %}</a></td>
             </tr>
           {% endfor %}
         </tbody>

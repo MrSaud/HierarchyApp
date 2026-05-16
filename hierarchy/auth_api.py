@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from .api_auth import authorize_tenant_api
 from .models import Employee, Sector, Tenant
 
 User = get_user_model()
@@ -71,6 +72,15 @@ def api_users(request):
     if tenant is None:
         return JsonResponse({"detail": "Unknown or inactive tenant."}, status=400)
 
+    if not authorize_tenant_api(request, tenant):
+        return JsonResponse(
+            {
+                "detail": "Authentication required. Send this tenant's API key "
+                "(default header X-Api-Key) or use a staff session for the same tenant.",
+            },
+            status=401,
+        )
+
     try:
         validate_password(password, user=None)
     except DjangoValidationError as e:
@@ -98,6 +108,8 @@ def api_users(request):
                 "samAccountName": user.get_username(),
                 "givenName": user.first_name,
                 "surname": user.last_name,
+                "civil_id": "",
+                "employee_number": "",
                 "tenant": {
                     "slug": tenant.slug,
                     "name": tenant.name,
@@ -154,6 +166,9 @@ def api_login(request):
         if t is not None
         else None
     )
+    emp_login = Employee.objects.filter(user=user).only("civil_id", "employee_number").first()
+    civil_id_login = (emp_login.civil_id or "") if emp_login else ""
+    employee_number_login = (emp_login.employee_number or "") if emp_login else ""
     return JsonResponse(
         {
             "detail": "Logged in.",
@@ -162,6 +177,8 @@ def api_login(request):
                 "username": user.get_username(),
                 "email": user.email or "",
                 "is_staff": user.is_staff,
+                "civil_id": civil_id_login,
+                "employee_number": employee_number_login,
                 "tenant": tenant_payload,
             },
         },

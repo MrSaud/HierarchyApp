@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Delegation templates" %}{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide d365-card--table-card">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>{% trans "Delegation templates" %}</h1>
+      {% if structure_tenant %}
+      <p class="d365-card__subtitle">
+        Tenant: <strong>{{ structure_tenant.name }}</strong> —
+        patterns such as acting director: default length, full substitute, eligible positions.
+      </p>
+      {% else %}
+      <p class="d365-card__subtitle">Reusable delegation patterns per tenant.</p>
+      {% endif %}
+    </div>
+    {% if structure_tenant %}
+    <div class="d365-card__actions">
+      <a href="{% url 'hierarchy:delegation_list' %}" class="d365-btn">{% trans "Delegations" %}</a>
+      <a href="{% url 'hierarchy:delegation_template_create' %}" class="d365-btn d365-btn--primary">{% trans "New template" %}</a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not structure_tenant %}
+    <p class="d365-help">Superusers: pick <strong>Scope</strong> in the app bar.</p>
+  {% elif not templates %}
+    <p class="d365-empty">No templates yet. <a href="{% url 'hierarchy:delegation_template_create' %}">{% trans "Create one" %}</a> (e.g. “Acting director — 30 days”).</p>
+  {% else %}
+    <div class="d365-table-wrap">
+      <table class="d365-table">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Default days</th>
+            <th scope="col">Full substitute</th>
+            <th scope="col">Eligible positions</th>
+            <th scope="col"><span class="d365-visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in templates %}
+          <tr>
+            <td><strong>{{ t.name }}</strong>{% if t.description %}<br><span class="d365-muted">{{ t.description|truncatewords:16 }}</span>{% endif %}</td>
+            <td>{% if t.default_duration_days %}{{ t.default_duration_days }}{% else %}—{% endif %}</td>
+            <td>{% if t.default_is_full_substitute %}Yes{% else %}No{% endif %}</td>
+            <td class="d365-muted">{% with n=t.eligible_delegatee_positions.all|length %}{% if n %}{{ n }} position(s){% else %}Any{% endif %}{% endwith %}</td>
+            <td class="d365-table__actions">
+              <a href="{% url 'hierarchy:delegation_template_edit' t.pk %}" class="d365-link">{% trans "Edit" %}</a>
+              {% if t.delegation_count == 0 %}
+              <form method="post" action="{% url 'hierarchy:delegation_template_delete' t.pk %}" class="d365-inline-form" onsubmit="return confirm('Delete this template?');">
+                {% csrf_token %}
+                <button type="submit" class="d365-link d365-link--danger">{% trans "Remove" %}</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="d365-help d365-mt">
+      <strong>Full substitute</strong> delegations cannot overlap another full delegation for the same delegator.
+      Eligible positions limit who can be chosen as delegatee when this template is used on <strong>New delegation</strong>.
+    </p>
+  {% endif %}
+</div>
+{% endblock %}

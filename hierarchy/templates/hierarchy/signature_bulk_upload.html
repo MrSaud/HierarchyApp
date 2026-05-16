@@ -1,25 +1,25 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Bulk signature upload{% endblock %}
+{% block title %}{% trans "Bulk signature upload" %}{% endblock %}
 
 {% block content %}
 <div class="d365-card d365-card--wide">
   <div class="d365-card__header-row">
     <div>
-      <h1>Bulk signature upload</h1>
+      <h1>{% trans "Bulk signature upload" %}</h1>
       <p class="d365-card__subtitle">
         Upload many images at once. Each filename (without extension) is matched to one employee in your current scope.
         Max {{ max_signatures }} signature images per employee.
       </p>
     </div>
-    <a href="{% url 'hierarchy:employee_list' %}" class="d365-btn">Employees</a>
+    <a href="{% url 'hierarchy:employee_list' %}" class="d365-btn">{% trans "Employees" %}</a>
   </div>
 
   <form id="bulk-signature-form" method="post" enctype="multipart/form-data" class="d365-form" action="{% url 'hierarchy:signature_bulk_upload' %}">
     {% csrf_token %}
     <fieldset class="d365-field">
-      <legend class="d365-label">Match filenames to employees using</legend>
+      <legend class="d365-label">{% trans "Match filenames to employees using" %}</legend>
       <p class="d365-help">
         Rename files so the part before <code>.</code> equals the key below — for example
         <code>jdoe.png</code> for username <strong>jdoe</strong>, or <code>293847561.png</code> for civil ID <strong>293847561</strong>,
@@ -41,7 +41,7 @@
       </div>
     </fieldset>
     <div class="d365-field">
-      <label class="d365-label" for="id_bulk_signature_files">Image files</label>
+      
       <p class="d365-help">PNG, JPEG, etc. Multiple selection allowed; each file maps independently.</p>
       <input type="file" name="bulk_signature_files" id="id_bulk_signature_files" class="d365-file-input" accept="image/*" multiple required>
     </div>
@@ -61,7 +61,7 @@
       ></progress>
     </div>
     <div class="d365-form-actions">
-      <button type="submit" class="d365-btn d365-btn--primary">Upload and assign</button>
+      <button type="submit" class="d365-btn d365-btn--primary">{% trans "Upload and assign" %}</button>
     </div>
   </form>
 </div>

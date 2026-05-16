@@ -17,7 +17,15 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .access import ensure_employee_access, ensure_tenant_manage
+from .access import (
+    ensure_employee_access,
+    ensure_structure_staff,
+    ensure_tenant_api_manage,
+    ensure_tenant_manage,
+    resolve_active_structure_tenant,
+)
+from .audit_store import record_audit
+from .api_auth import generate_tenant_api_token
 from .forms import (
     EmployeePhotoForm,
     EmployeePositionAssignmentForm,
@@ -25,9 +33,15 @@ from .forms import (
     EmployeeUserCreationForm,
     EmployeeUserEditForm,
     SignatureImageMetaForm,
+    TenantApiHeaderForm,
     TenantForm,
     MAX_SIGNATURE_IMAGES,
 )
+from .tenant_api_credentials import (
+    effective_tenant_api_key,
+    effective_tenant_api_key_header,
+)
+from .user_tenant import get_user_tenant, get_user_tenant_id
 from .remote_users import (
     RemoteUserSyncError,
     build_users_list_url,
@@ -37,14 +51,15 @@ from .remote_users import (
     sync_users_for_tenant,
     sync_users_for_tenant_events,
 )
-from .models import AuditLog, Employee, SignatureImage, Tenant
+from .employee_bulk_import import import_employees_from_csv
+from .models import AuditLog, Delegation, Employee, SignatureImage, Tenant
+from .organization_structure import count_structure_stats
 from .tenant_api_credentials import merge_outbound_api_headers
 from .tenant_scope import (
     SESSION_ACTIVE_TENANT_KEY,
     SESSION_TENANT_SCOPE_ALL,
     get_superuser_active_tenant,
 )
-from .user_tenant import get_user_tenant, get_user_tenant_id
 
 
 def _employee_scope_queryset(request):
@@ -63,7 +78,7 @@ def _employee_scope_queryset(request):
     st = get_superuser_active_tenant(request)
     if st is not None:
         return qs.filter(tenant_id=st.pk)
-    return qs
+    return Employee.objects.none()
 
 
 def _tenant_id_for_manager_scope(request):
@@ -91,8 +106,96 @@ def _tenant_id_for_manager_scope_get(request):
     return get_user_tenant_id(request.user)
 
 
+def _resolve_employee_create_tenant_post(request):
+    """Target tenant for employee create / CSV bulk import (matches single-create rules)."""
+    if not request.user.is_superuser:
+        tid = get_user_tenant_id(request.user)
+        if tid is None:
+            return None
+        return Tenant.objects.filter(pk=tid, is_active=True).first()
+
+    st = get_superuser_active_tenant(request)
+    if st is not None:
+        return Tenant.objects.filter(pk=st.pk, is_active=True).first()
+
+    raw = request.POST.get("tenant")
+    if raw is None or raw == "":
+        return None
+    try:
+        tid = int(raw)
+    except (ValueError, TypeError):
+        return None
+    return Tenant.objects.filter(pk=tid, is_active=True).first()
+
+
 def index(request):
-    return render(request, "hierarchy/index.html")
+    hub = {"hub_tenant": None, "hub_stats": None}
+    if request.user.is_authenticated and request.user.is_staff:
+        tenant = resolve_active_structure_tenant(request)
+        hub["hub_tenant"] = tenant
+        if tenant is not None:
+            stats = count_structure_stats(tenant)
+            stats["employees"] = Employee.objects.filter(tenant=tenant).count()
+            stats["delegations"] = Delegation.objects.filter(tenant=tenant).count()
+            hub["hub_stats"] = stats
+    return render(request, "hierarchy/index.html", hub)
+
+
+@login_required
+def hub_search(request):
+    """Cross-entity search over people, units, and positions for the active tenant."""
+    from django.db.models import Q
+
+    from .models import OrganizationalUnit, Position
+
+    ensure_structure_staff(request)
+    tenant = resolve_active_structure_tenant(request)
+    query = (request.GET.get("q") or "").strip()
+    too_short = 0 < len(query) < 2
+    employees_qs = units_qs = positions_qs = None
+    if tenant is not None and len(query) >= 2:
+        employees_qs = (
+            Employee.objects.filter(tenant=tenant)
+            .filter(
+                Q(user__username__icontains=query)
+                | Q(user__first_name__icontains=query)
+                | Q(user__last_name__icontains=query)
+                | Q(user__email__icontains=query)
+                | Q(employee_number__icontains=query)
+                | Q(job_title__icontains=query)
+                | Q(department__icontains=query)
+            )
+            .select_related("user")
+            .order_by("user__last_name", "user__first_name", "user__username")[:40]
+        )
+        units_qs = (
+            OrganizationalUnit.objects.filter(tenant=tenant)
+            .filter(Q(name__icontains=query) | Q(code__icontains=query))
+            .select_related("parent")
+            .order_by("sort_order", "name")[:25]
+        )
+        positions_qs = (
+            Position.objects.filter(tenant=tenant)
+            .filter(
+                Q(title__icontains=query)
+                | Q(code__icontains=query)
+                | Q(description__icontains=query),
+            )
+            .select_related("organizational_unit")
+            .order_by("sort_order", "title")[:25]
+        )
+    return render(
+        request,
+        "hierarchy/hub_search.html",
+        {
+            "structure_tenant": tenant,
+            "search_query": query,
+            "too_short": too_short,
+            "employees": list(employees_qs) if employees_qs is not None else [],
+            "org_units": list(units_qs) if units_qs is not None else [],
+            "positions": list(positions_qs) if positions_qs is not None else [],
+        },
+    )
 
 
 @login_required
@@ -135,11 +238,14 @@ def tenant_create(request):
         form = TenantForm(request.POST)
         if form.is_valid():
             tenant = form.save()
+            from .org_unit_types import ensure_default_org_unit_types
+
+            ensure_default_org_unit_types(tenant)
             messages.success(
                 request,
                 f'Tenant "{tenant.name}" ({tenant.slug}) was created.',
             )
-            return redirect("hierarchy:tenant_list")
+            return redirect("hierarchy:tenant_api_access_for", pk=tenant.pk)
     else:
         form = TenantForm()
     return render(
@@ -162,7 +268,11 @@ def tenant_switch(request):
     if raw in ("", "all"):
         request.session[SESSION_TENANT_SCOPE_ALL] = True
         request.session.pop(SESSION_ACTIVE_TENANT_KEY, None)
-        messages.success(request, "You are now viewing all tenants.")
+        messages.success(
+            request,
+            "Scope: all tenants (tenant records only). Choose a tenant in Scope to "
+            "manage employees, organization structure, and related data.",
+        )
     else:
         try:
             pk = int(raw)
@@ -196,6 +306,77 @@ def tenant_list(request):
         request,
         "hierarchy/tenant_list.html",
         {"tenants": tenants},
+    )
+
+
+def _tenant_api_token_session_key(tenant_pk: int) -> str:
+    return f"tenant_api_token_flash_{tenant_pk}"
+
+
+@login_required
+def tenant_api_access(request, pk=None):
+    """Staff: generate or revoke this tenant's API token for machine clients."""
+    if not request.user.is_staff:
+        raise PermissionDenied
+
+    if pk is not None:
+        tenant = get_object_or_404(Tenant, pk=pk)
+    else:
+        tenant = get_user_tenant(request.user)
+        if tenant is None:
+            messages.error(
+                request,
+                "Your account is not linked to a tenant employee record.",
+            )
+            return redirect("hierarchy:index")
+
+    ensure_tenant_api_manage(request, tenant)
+    flash_key = _tenant_api_token_session_key(tenant.pk)
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "generate":
+            token = generate_tenant_api_token()
+            tenant.api_key = token
+            tenant.save(update_fields=["api_key"])
+            request.session[flash_key] = token
+            messages.success(
+                request,
+                "New API token generated. Copy it below — it will not be shown again.",
+            )
+        elif action == "revoke":
+            tenant.api_key = ""
+            tenant.save(update_fields=["api_key"])
+            request.session.pop(flash_key, None)
+            messages.success(request, "API token revoked.")
+        elif action == "header":
+            form = TenantApiHeaderForm(request.POST)
+            if form.is_valid():
+                tenant.api_key_header = form.cleaned_data["api_key_header"] or ""
+                tenant.save(update_fields=["api_key_header"])
+                messages.success(request, "API key header name saved.")
+        if pk is not None:
+            return redirect("hierarchy:tenant_api_access_for", pk=tenant.pk)
+        return redirect("hierarchy:tenant_api_access")
+
+    new_token = request.session.pop(flash_key, None)
+    header_name = effective_tenant_api_key_header(tenant)
+    has_key = bool(effective_tenant_api_key(tenant))
+    site_base = request.build_absolute_uri("/").rstrip("/")
+    header_form = TenantApiHeaderForm(initial_header=tenant.api_key_header or "")
+
+    return render(
+        request,
+        "hierarchy/tenant_api_access.html",
+        {
+            "tenant": tenant,
+            "new_token": new_token,
+            "has_api_key": has_key,
+            "api_key_header": header_name,
+            "header_form": header_form,
+            "site_api_base": site_base,
+            "can_manage_tenant_record": request.user.is_superuser,
+        },
     )
 
 
@@ -431,10 +612,21 @@ def employee_list(request):
             "user__username",
         )
     )
+    needs_tenant_scope = (
+        request.user.is_superuser and get_superuser_active_tenant(request) is None
+    )
+    if needs_tenant_scope:
+        messages.warning(
+            request,
+            "Choose a tenant in Scope (superuser) to view and manage employees.",
+        )
     return render(
         request,
         "hierarchy/employee_list.html",
-        {"employees": employees},
+        {
+            "employees": employees,
+            "needs_tenant_scope": needs_tenant_scope,
+        },
     )
 
 
@@ -442,6 +634,75 @@ def employee_list(request):
 def employee_create(request):
     if not request.user.is_staff:
         raise PermissionDenied
+    if request.method == "POST" and request.POST.get("action") == "bulk_csv":
+        tid_scope = _tenant_id_for_manager_scope(request)
+        scope_tid = None
+        if request.user.is_superuser:
+            st = get_superuser_active_tenant(request)
+            if st:
+                scope_tid = st.pk
+        user_form = EmployeeUserCreationForm(
+            request.POST,
+            acting_user=request.user,
+            scope_tenant_id=scope_tid,
+        )
+        profile_form = EmployeeProfileForm(
+            request.POST,
+            request.FILES,
+            tenant_id=tid_scope,
+        )
+        tenant_obj = _resolve_employee_create_tenant_post(request)
+        upload = request.FILES.get("employee_csv")
+
+        if tenant_obj is None:
+            messages.error(
+                request,
+                "Select an active tenant before importing (use the tenant field under Account access).",
+            )
+        elif not upload:
+            messages.error(request, "Choose a CSV file to upload.")
+        else:
+            gen_pw = bool(request.POST.get("generate_passwords"))
+            result = import_employees_from_csv(
+                upload.read(),
+                tenant_obj,
+                generate_passwords=gen_pw,
+            )
+            if result.created:
+                messages.success(
+                    request,
+                    f"Imported {result.created} employee(s).",
+                )
+            if result.errors:
+                cap = 25
+                tail = f" … (+{len(result.errors) - cap} more)" if len(result.errors) > cap else ""
+                messages.warning(
+                    request,
+                    "Row errors: " + " · ".join(result.errors[:cap]) + tail,
+                )
+            if result.warnings:
+                wcap = 15
+                wtail = (
+                    f" … (+{len(result.warnings) - wcap} more)" if len(result.warnings) > wcap else ""
+                )
+                messages.warning(
+                    request,
+                    "Notes: " + " · ".join(result.warnings[:wcap]) + wtail,
+                )
+            if result.created == 0 and not result.errors:
+                messages.info(request, "No rows were imported.")
+
+            return redirect("hierarchy:employee_create")
+
+        return render(
+            request,
+            "hierarchy/employee_create.html",
+            {
+                "user_form": user_form,
+                "profile_form": profile_form,
+            },
+        )
+
     if request.method == "POST":
         tid_scope = _tenant_id_for_manager_scope(request)
         scope_tid = None
@@ -519,9 +780,7 @@ def employee_edit(request, pk):
     if request.method == "POST" and action == "add_assignment":
         assign_form = EmployeePositionAssignmentForm(request.POST, employee=employee)
         if assign_form.is_valid():
-            assignment = assign_form.save(commit=False)
-            assignment.full_clean()
-            assignment.save()
+            assign_form.save()
             messages.success(request, "Position assignment added.")
             return redirect("hierarchy:employee_edit", pk=employee.pk)
         user_form = EmployeeUserEditForm(instance=user)
@@ -693,6 +952,26 @@ def user_sync(request):
         stats = sync_users_for_tenant(sync_tenant, rows)
         context["last_stats"] = stats
         context["last_row_count"] = len(rows)
+        record_audit(
+            "remote_user_sync",
+            "mode=post tenant_id=%s slug=%s remote_rows=%s created=%s updated=%s skipped=%s "
+            "tenant_linked=%s employees_created=%s employees_updated=%s managers_linked=%s "
+            "error_count=%s"
+            % (
+                sync_tenant.pk,
+                sync_tenant.slug,
+                len(rows),
+                stats.created,
+                stats.updated,
+                stats.skipped,
+                stats.tenant_linked,
+                stats.employees_created,
+                stats.employees_updated,
+                stats.managers_linked,
+                len(stats.errors),
+            ),
+            user=request.user if request.user.is_authenticated else None,
+        )
         messages.success(
             request,
             f"Synced {len(rows)} remote row(s): {stats.created} users created, "
@@ -708,6 +987,12 @@ def user_sync(request):
                 "Issues: " + " · ".join(stats.errors[:15]),
             )
     except RemoteUserSyncError as exc:
+        record_audit(
+            "remote_user_sync_failed",
+            "mode=post tenant_id=%s slug=%s error=%s"
+            % (sync_tenant.pk, sync_tenant.slug, str(exc)[:800]),
+            user=request.user if request.user.is_authenticated else None,
+        )
         messages.error(request, str(exc))
 
     return render(request, "hierarchy/user_sync.html", context)
@@ -740,6 +1025,13 @@ def user_sync_stream(request):
             status=400,
         )
 
+    stream_user = request.user if request.user.is_authenticated else None
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if xff:
+        stream_ip = xff.split(",")[0].strip()
+    else:
+        stream_ip = request.META.get("REMOTE_ADDR", "") or ""
+
     def ndjson_iter():
         yield _sync_ndjson_line({"phase": "fetch", "pct": 0, "label": "Fetching remote users…"})
         try:
@@ -747,6 +1039,13 @@ def user_sync_stream(request):
             rows = extract_user_rows(payload)
         except RemoteUserSyncError as exc:
             yield _sync_ndjson_line({"phase": "error", "message": str(exc)})
+            record_audit(
+                "remote_user_sync_failed",
+                "mode=stream_fetch tenant_id=%s slug=%s error=%s"
+                % (sync_tenant.pk, sync_tenant.slug, str(exc)[:800]),
+                user=stream_user,
+                ip=stream_ip,
+            )
             return
 
         n = len(rows)
@@ -760,10 +1059,32 @@ def user_sync_stream(request):
             elif ev["phase"] == "managers":
                 yield _sync_ndjson_line(ev)
             elif ev["phase"] == "complete":
+                st = ev["stats"]
+                record_audit(
+                    "remote_user_sync",
+                    "mode=stream tenant_id=%s slug=%s remote_rows=%s created=%s updated=%s skipped=%s "
+                    "tenant_linked=%s employees_created=%s employees_updated=%s managers_linked=%s "
+                    "error_count=%s"
+                    % (
+                        sync_tenant.pk,
+                        sync_tenant.slug,
+                        ev["row_count"],
+                        st.created,
+                        st.updated,
+                        st.skipped,
+                        st.tenant_linked,
+                        st.employees_created,
+                        st.employees_updated,
+                        st.managers_linked,
+                        len(st.errors),
+                    ),
+                    user=stream_user,
+                    ip=stream_ip,
+                )
                 yield _sync_ndjson_line(
                     {
                         "phase": "complete",
-                        "stats": asdict(ev["stats"]),
+                        "stats": asdict(st),
                         "row_count": ev["row_count"],
                         "pct": 100,
                         "label": "Done",
@@ -870,6 +1191,8 @@ def api_guide(request):
     """Staff reference: HTTP JSON APIs implemented by this Django app (machine + browser clients)."""
     if not request.user.is_staff:
         raise PermissionDenied
+    from .app_api_guide import api_guide_context
+
     site_api_base = request.build_absolute_uri("/").rstrip("/")
     employee_api_token_configured = bool(
         (getattr(settings, "EMPLOYEE_API_TOKEN", None) or "").strip()
@@ -877,10 +1200,10 @@ def api_guide(request):
     return render(
         request,
         "hierarchy/api_guide.html",
-        {
-            "site_api_base": site_api_base,
-            "employee_api_token_configured": employee_api_token_configured,
-        },
+        api_guide_context(
+            site_api_base,
+            employee_api_token_configured=employee_api_token_configured,
+        ),
     )
 
 

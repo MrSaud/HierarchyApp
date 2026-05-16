@@ -205,7 +205,41 @@ Staff who are **not** superusers must use a `tenant_id` equal to their own emplo
     "mobile_number": "",
     "home_address": "",
     "emergency_contact": "",
-    "created_at": "2025-01-01T12:00:00+00:00"
+    "created_at": "2025-01-01T12:00:00+00:00",
+    "organizational_units": [
+      {
+        "id": 10,
+        "name": "إدارة الشؤون المالية",
+        "code": "FIN",
+        "sort_order": 0,
+        "parent": {
+          "id": 5,
+          "name": "الإدارة العامة للشؤون الإدارية والمالية",
+          "code": "GAF",
+          "sort_order": 0
+        },
+        "position": { "id": 3, "title": "أخصائي", "code": "P0003" },
+        "is_primary": true
+      }
+    ],
+    "organizational_unit": {
+      "id": 10,
+      "name": "إدارة الشؤون المالية",
+      "code": "FIN",
+      "sort_order": 0,
+      "parent": {
+        "id": 5,
+        "name": "الإدارة العامة للشؤون الإدارية والمالية",
+        "code": "GAF",
+        "sort_order": 0
+      }
+    },
+    "organizational_unit_parent": {
+      "id": 5,
+      "name": "الإدارة العامة للشؤون الإدارية والمالية",
+      "code": "GAF",
+      "sort_order": 0
+    }
   },
   "signatures": [
     {
@@ -221,6 +255,8 @@ Staff who are **not** superusers must use a `tenant_id` equal to their own emplo
 ```
 
 - Dates use ISO `YYYY-MM-DD` where applicable; `created_at` is ISO datetime.
+- `organizational_units` lists each **current** position assignment’s unit (via `Position` → `OrganizationalUnit`), each with nested `parent` when set.
+- `organizational_unit` / `organizational_unit_parent` are the primary current assignment’s unit and its parent (convenience); both are `null` when the employee has no current assignment under a unit.
 - `signatures` may be an empty array.
 
 ### Examples

@@ -1,22 +1,25 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}Employees{% endblock %}
+{% block title %}{% trans "Employees" %}{% endblock %}
 
 {% block content %}
 <div class="d365-card d365-card--wide d365-card--table-card">
   <div class="d365-card__header-row">
     <div>
-      <h1>Employees</h1>
+      <h1>{% trans "Employees" %}</h1>
       <p class="d365-card__subtitle">Accounts linked to an employee profile. Select a row to edit.</p>
     </div>
     <div class="d365-card__actions">
-      <a href="{% url 'hierarchy:signature_bulk_upload' %}" class="d365-btn">Bulk signatures</a>
-      <a href="{% url 'hierarchy:employee_create' %}" class="d365-btn d365-btn--primary">Create employee</a>
+      <a href="{% url 'hierarchy:signature_bulk_upload' %}" class="d365-btn">{% trans "Bulk signatures" %}</a>
+      <a href="{% url 'hierarchy:employee_create' %}" class="d365-btn d365-btn--primary">{% trans "Create employee" %}</a>
     </div>
   </div>
 
-  {% if not employees %}
-    <p class="d365-empty">No employees yet. <a href="{% url 'hierarchy:employee_create' %}">Create the first employee</a>.</p>
+  {% if needs_tenant_scope %}
+    <p class="d365-empty">{% trans "Choose a tenant in Scope (app bar) to view employees for that organization." %}</p>
+  {% elif not employees %}
+    <p class="d365-empty">No employees yet. <a href="{% url 'hierarchy:employee_create' %}">{% trans "Create the first employee" %}</a>.</p>
   {% else %}
     <div class="d365-table-wrap">
       <table class="d365-table">
@@ -55,7 +58,7 @@
                 <a href="{% url 'hierarchy:signature_manage' e.pk %}" class="d365-link">{{ e.signature_count }}</a>
               </td>
               <td class="d365-table__actions">
-                <a href="{% url 'hierarchy:employee_edit' e.pk %}" class="d365-link">Edit</a>
+                <a href="{% url 'hierarchy:employee_edit' e.pk %}" class="d365-link">{% trans "Edit" %}</a>
               </td>
             </tr>
           {% endfor %}

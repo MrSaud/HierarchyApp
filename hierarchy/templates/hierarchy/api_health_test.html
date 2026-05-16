@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}API health{% endblock %}
+{% block title %}{% trans "API health" %}{% endblock %}
 
 {% block content %}
 <div class="d365-card d365-card--wide">
-  <h1>External API health</h1>
+  <h1>{% trans "External API health" %}</h1>
   <p class="d365-card__subtitle">
     Server-side GET from this app to <code class="d365-code">/api/health</code> on this tenant’s API base when configured; otherwise the global fallback URL from settings.
   </p>
@@ -12,7 +13,7 @@
   {% if user.is_superuser and tenant_choices %}
   <form method="get" action="{% url 'hierarchy:api_health_test' %}" class="d365-form d365-form--inline" style="margin-bottom: 16px;">
     <div class="d365-field" style="margin-bottom: 0;">
-      <label class="d365-label" for="id-health-tenant">Tenant API to probe</label>
+      
       <select name="tenant" id="id-health-tenant" class="d365-select" onchange="this.form.submit()">
         <option value=""{% if not probe_tenant %} selected{% endif %}>— Global fallback (settings) —</option>
         {% for t in tenant_choices %}
@@ -20,7 +21,7 @@
         {% endfor %}
       </select>
     </div>
-    <noscript><button type="submit" class="d365-btn d365-btn--primary">Apply</button></noscript>
+    <noscript><button type="submit" class="d365-btn d365-btn--primary">{% trans "Apply" %}</button></noscript>
   </form>
   {% endif %}
 
@@ -61,13 +62,13 @@
   {% endif %}
 
   <div class="d365-form__actions">
-    <a href="{% url 'hierarchy:api_health_test' %}{% if user.is_superuser and probe_tenant %}?tenant={{ probe_tenant.slug|urlencode }}{% endif %}" class="d365-btn d365-btn--primary">Run again</a>
-    <a href="{% url 'hierarchy:index' %}" class="d365-link d365-link--standalone">Home</a>
+    <a href="{% url 'hierarchy:api_health_test' %}{% if user.is_superuser and probe_tenant %}?tenant={{ probe_tenant.slug|urlencode }}{% endif %}" class="d365-btn d365-btn--primary">{% trans "Run again" %}</a>
+    <a href="{% url 'hierarchy:index' %}" class="d365-link d365-link--standalone">{% trans "Home" %}</a>
   </div>
 
   <p class="d365-help">
     Expected live response from this deployment is typically <code class="d365-code">{"status":"Healthy"}</code>
-    (see <a href="{{ health_url }}" target="_blank" rel="noopener noreferrer">open raw URL</a> in a new tab from your browser).
+    (see <a href="{{ health_url }}" target="_blank" rel="noopener noreferrer">{% trans "open raw URL" %}</a> in a new tab from your browser).
   </p>
 </div>
 {% endblock %}

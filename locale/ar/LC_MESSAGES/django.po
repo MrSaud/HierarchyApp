@@ -1,0 +1,609 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: HierarchyApp\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-05-15 22:22+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5);\n"
+
+msgid "English"
+msgstr "الإنجليزية"
+
+msgid "Arabic"
+msgstr "العربية"
+
+msgid "Add sub-unit"
+msgstr "إضافة وحدة فرعية"
+
+msgid "Edit"
+msgstr "تعديل"
+
+msgid "Assign"
+msgstr "تعيين"
+
+msgid "API guide"
+msgstr "دليل واجهة البرمجة"
+
+msgid "Sync users"
+msgstr "مزامنة المستخدمين"
+
+msgid "API health"
+msgstr "صحة واجهة البرمجة"
+
+msgid "Endpoints"
+msgstr "نقاط النهاية"
+
+msgid "Response conventions"
+msgstr "اتفاقيات الاستجابة"
+
+msgid "Authentication"
+msgstr "المصادقة"
+
+msgid "API access"
+msgstr "الوصول إلى واجهة البرمجة"
+
+msgid "Request"
+msgstr "الطلب"
+
+msgid "Responses"
+msgstr "الاستجابات"
+
+msgid "Response JSON"
+msgstr "JSON للاستجابة"
+
+msgid "Example request"
+msgstr "مثال على الطلب"
+
+msgid "API access (tokens)"
+msgstr "الوصول إلى واجهة البرمجة (الرموز)"
+
+msgid "API health (external)"
+msgstr "صحة واجهة البرمجة (خارجي)"
+
+msgid "Home"
+msgstr "الرئيسية"
+
+msgid "External API health"
+msgstr "صحة واجهة البرمجة الخارجية"
+
+msgid "Apply"
+msgstr "تطبيق"
+
+msgid "Run again"
+msgstr "تشغيل مرة أخرى"
+
+msgid "open raw URL"
+msgstr "فتح الرابط الخام"
+
+msgid "Audit log"
+msgstr "سجل التدقيق"
+
+msgid "Previous"
+msgstr "السابق"
+
+msgid "Next"
+msgstr "التالي"
+
+msgid "Back to list"
+msgstr "العودة إلى القائمة"
+
+msgid "Delegation templates"
+msgstr "قوالب التفويض"
+
+msgid "Delegations"
+msgstr "التفويضات"
+
+msgid "Templates"
+msgstr "القوالب"
+
+msgid "Employees"
+msgstr "الموظفون"
+
+msgid "New delegation"
+msgstr "تفويض جديد"
+
+msgid "Create one"
+msgstr "إنشاء"
+
+msgid "Remove"
+msgstr "إزالة"
+
+msgid "New template"
+msgstr "قالب جديد"
+
+msgid "Create employee"
+msgstr "إنشاء موظف"
+
+msgid ""
+"Create an account and complete personal, contact, and employment details. "
+"After saving, you can add signature images on the next step."
+msgstr ""
+"أنشئ حسابًا وأكمل البيانات الشخصية وبيانات الاتصال والتوظيف. بعد الحفظ يمكنك"
+" إضافة صور التوقيع في الخطوة التالية."
+
+msgid "Account access"
+msgstr "الوصول إلى الحساب"
+
+msgid "Personal information"
+msgstr "المعلومات الشخصية"
+
+msgid "Full name"
+msgstr "الاسم الكامل"
+
+msgid "Contact information"
+msgstr "معلومات الاتصال"
+
+msgid "Employment information"
+msgstr "معلومات التوظيف"
+
+msgid "Bulk import (CSV)"
+msgstr "استيراد جماعي (CSV)"
+
+msgid "CSV file"
+msgstr "ملف CSV"
+
+msgid "Generate passwords (omit password column)"
+msgstr "توليد كلمات مرور (تجاهل عمود كلمة المرور)"
+
+msgid "Import from CSV"
+msgstr "استيراد من CSV"
+
+msgid "Cancel"
+msgstr "إلغاء"
+
+msgid "Edit employee"
+msgstr "تعديل الموظف"
+
+msgid "Manage signature images"
+msgstr "إدارة صور التوقيع"
+
+msgid "Account"
+msgstr "الحساب"
+
+msgid "Save changes"
+msgstr "حفظ التغييرات"
+
+msgid "Organization positions"
+msgstr "مناصب المؤسسة"
+
+msgid "Organization"
+msgstr "المؤسسة"
+
+msgid "Assign to positions"
+msgstr "التعيين على المناصب"
+
+msgid "Add to position"
+msgstr "إضافة إلى المنصب"
+
+msgid "Bulk signatures"
+msgstr "توقيعات جماعية"
+
+msgid "Create the first employee"
+msgstr "إنشاء أول موظف"
+
+msgid "Employee photo"
+msgstr "صورة الموظف"
+
+msgid "Save employee photo"
+msgstr "حفظ صورة الموظف"
+
+msgid "Directory search"
+msgstr "بحث الدليل"
+
+msgid "Search"
+msgstr "بحث"
+
+msgid "Organization hub"
+msgstr "مركز المؤسسة"
+
+msgid "Canonical people and structure for"
+msgstr "الأشخاص والهيكل المرجعي لـ"
+
+msgid "Use search, structure, and assignments to keep this tenant current."
+msgstr "استخدم البحث والهيكل والتعيينات للحفاظ على تحديث هذا المستأجر."
+
+msgid "Pick a"
+msgstr "اختر"
+
+msgid "Scope"
+msgstr "النطاق"
+
+msgid ""
+"in the app bar to see live counts and shortcuts for one tenant, or use the "
+"menu to work across tenants."
+msgstr ""
+"في شريط التطبيق لعرض الأعداد المباشرة والاختصارات لمستأجر واحد، أو استخدم "
+"القائمة للعمل عبر المستأجرين."
+
+msgid ""
+"Your profile and photo live here; administrators maintain the official org "
+"structure."
+msgstr "ملفك الشخصي وصورتك هنا؛ يحافظ المسؤولون على الهيكل الرسمي للمؤسسة."
+
+msgid "Sign in to open your workspace."
+msgstr "سجّل الدخول لفتح مساحة العمل."
+
+msgid "Search this tenant"
+msgstr "البحث في هذا المستأجر"
+
+msgid "Name, unit, position, job title…"
+msgstr "الاسم، الوحدة، المنصب، المسمى الوظيفي…"
+
+msgid ""
+"Matches people, organizational units, and positions (at least 2 characters)."
+msgstr "يطابق الأشخاص والوحدات التنظيمية والمناصب (حرفان على الأقل)."
+
+msgid "Tenant snapshot"
+msgstr "لمحة عن المستأجر"
+
+msgid "Units"
+msgstr "الوحدات"
+
+msgid "Positions"
+msgstr "المناصب"
+
+msgid "Assignments"
+msgstr "التعيينات"
+
+msgid "Org chart"
+msgstr "المخطط التنظيمي"
+
+msgid "People"
+msgstr "الأشخاص"
+
+msgid "Employee directory"
+msgstr "دليل الموظفين"
+
+msgid "Structure"
+msgstr "الهيكل"
+
+msgid "Organization structure"
+msgstr "الهيكل التنظيمي"
+
+msgid "Organizational units"
+msgstr "الوحدات التنظيمية"
+
+msgid "Unit types"
+msgstr "أنواع الوحدات"
+
+msgid "Authority &amp; audit"
+msgstr "الصلاحيات والتدقيق"
+
+msgid "Integrations &amp; data"
+msgstr "التكاملات والبيانات"
+
+msgid "Where to start"
+msgstr "من أين تبدأ"
+
+msgid "Tenants"
+msgstr "المستأجرون"
+
+msgid "open a tenant, then set"
+msgstr "افتح مستأجرًا ثم عيّن"
+
+msgid "to work as “source of truth” for that org."
+msgstr "ليعمل كـ«مصدر الحقيقة» لتلك المؤسسة."
+
+msgid "structure when scope is set."
+msgstr "الهيكل عند تعيين النطاق."
+
+msgid "directory across your access."
+msgstr "الدليل ضمن صلاحياتك."
+
+msgid "Your profile"
+msgstr "ملفك الشخصي"
+
+msgid "picture shown in the app"
+msgstr "الصورة المعروضة في التطبيق"
+
+msgid "New unit type"
+msgstr "نوع وحدة جديد"
+
+msgid "Overview"
+msgstr "نظرة عامة"
+
+msgid "New unit"
+msgstr "وحدة جديدة"
+
+msgid "Organizational unit types"
+msgstr "أنواع الوحدات التنظيمية"
+
+msgid "New type"
+msgstr "نوع جديد"
+
+msgid "Restore missing defaults"
+msgstr "استعادة الافتراضات الناقصة"
+
+msgid "Assign people"
+msgstr "تعيين الأشخاص"
+
+msgid "Create a unit"
+msgstr "إنشاء وحدة"
+
+msgid "create a position"
+msgstr "إنشاء منصب"
+
+msgid "Positions without a unit"
+msgstr "مناصب بلا وحدة"
+
+msgid "Expand all"
+msgstr "توسيع الكل"
+
+msgid "Collapse all"
+msgstr "طي الكل"
+
+msgid "Assign employees to positions"
+msgstr "تعيين الموظفين على المناصب"
+
+#, fuzzy
+#| msgid "Tenant"
+msgid "Tenant:"
+msgstr "المستأجر:"
+
+msgid ""
+"drag employees onto a position or use Assign / Remove. Multiple people can "
+"share a position."
+msgstr ""
+"اسحب الموظفين إلى منصب أو استخدم تعيين/إزالة. يمكن لعدة أشخاص مشاركة منصب "
+"واحد."
+
+msgid "Drag employees onto a selected position to create assignments."
+msgstr "اسحب الموظفين إلى منصب محدد لإنشاء التعيينات."
+
+msgid "Superusers: pick"
+msgstr "المستخدمون الفائقون: اختر"
+
+msgid "in the app bar. Tenant staff: uses your employee tenant automatically."
+msgstr "في شريط التطبيق. موظفو المستأجر: يُستخدم مستأجر موظفك تلقائيًا."
+
+#, fuzzy
+#| msgid "New position"
+msgid "No positions yet."
+msgstr "لا توجد مناصب بعد."
+
+msgid "Create a position"
+msgstr "إنشاء منصب"
+
+msgid "first."
+msgstr "أولاً."
+
+msgid "Click a position to select it as the drop target."
+msgstr "انقر منصبًا لتحديده كهدف الإسقاط."
+
+#, fuzzy
+#| msgid "Positions"
+msgid "Position list"
+msgstr "قائمة المناصب"
+
+#, fuzzy
+#| msgid "(inactive)"
+msgid "Inactive"
+msgstr "غير نشط"
+
+msgid "Available employees"
+msgstr "الموظفون المتاحون"
+
+msgid "Filter"
+msgstr "تصفية"
+
+msgid "Name or username…"
+msgstr "الاسم أو اسم المستخدم…"
+
+msgid "Available employees — drag from here or drop here to unassign"
+msgstr "الموظفون المتاحون — اسحب من هنا أو أفلت هنا لإلغاء التعيين"
+
+msgid "Select a position to see who can be assigned."
+msgstr "اختر منصبًا لمعرفة من يمكن تعيينه."
+
+#, fuzzy
+#| msgid "Assignments"
+msgid "Assigned to"
+msgstr "معيّن إلى"
+
+msgid "New assignments are primary roles"
+msgstr "التعيينات الجديدة هي أدوار أساسية"
+
+msgid ""
+"Only one primary assignment is kept per person; marking a new one as primary"
+" clears primary on their other positions."
+msgstr ""
+"يُحتفظ بتعيين أساسي واحد فقط لكل شخص؛ عند تعيين تعيين جديد كأساسي يُلغى "
+"الأساسي على مناصبهم الأخرى."
+
+#, fuzzy
+#| msgid "Assign employees to positions"
+msgid "Assigned employees — drop here to assign"
+msgstr "الموظفون المعيّنون — أفلت هنا للتعيين"
+
+msgid "Select a position on the left, then drag employees here."
+msgstr "اختر منصبًا على اليسار، ثم اسحب الموظفين إلى هنا."
+
+msgid "All positions"
+msgstr "جميع المناصب"
+
+msgid "Edit position"
+msgstr "تعديل المنصب"
+
+msgid "Current assignments"
+msgstr "التعيينات الحالية"
+
+msgid "Add assignment"
+msgstr "إضافة تعيين"
+
+msgid "Past assignments"
+msgstr "التعيينات السابقة"
+
+msgid "Position detail"
+msgstr "تفاصيل المنصب"
+
+msgid "New position"
+msgstr "منصب جديد"
+
+msgid "Back to home"
+msgstr "العودة للرئيسية"
+
+msgid "Bulk signature upload"
+msgstr "رفع توقيعات جماعي"
+
+msgid "Match filenames to employees using"
+msgstr "مطابقة أسماء الملفات مع الموظفين باستخدام"
+
+msgid "Upload and assign"
+msgstr "رفع وتعيين"
+
+msgid "Signature images"
+msgstr "صور التوقيع"
+
+msgid "← Back to employee"
+msgstr "← العودة إلى الموظف"
+
+msgid "Add images"
+msgstr "إضافة صور"
+
+msgid "Upload"
+msgstr "رفع"
+
+msgid "Existing signatures"
+msgstr "التوقيعات الحالية"
+
+msgid "Save row"
+msgstr "حفظ الصف"
+
+msgid "Remove image"
+msgstr "إزالة الصورة"
+
+msgid "Edit tenant"
+msgstr "تعديل المستأجر"
+
+msgid "Copy token"
+msgstr "نسخ الرمز"
+
+msgid "Token status"
+msgstr "حالة الرمز"
+
+msgid "Revoke token"
+msgstr "إلغاء الرمز"
+
+msgid "How to call the API"
+msgstr "كيفية استدعاء واجهة البرمجة"
+
+msgid "Custom header name"
+msgstr "اسم ترويسة مخصص"
+
+msgid "Save header name"
+msgstr "حفظ اسم الترويسة"
+
+msgid "Create tenant"
+msgstr "إنشاء مستأجر"
+
+msgid "All tenants"
+msgstr "جميع المستأجرين"
+
+msgid "Save tenant"
+msgstr "حفظ المستأجر"
+
+msgid "Back to tenants"
+msgstr "العودة إلى المستأجرين"
+
+msgid "API"
+msgstr "واجهة البرمجة"
+
+msgid "Sync users from API"
+msgstr "مزامنة المستخدمين من واجهة البرمجة"
+
+msgid "Run sync"
+msgstr "تشغيل المزامنة"
+
+msgid "Last run"
+msgstr "آخر تشغيل"
+
+msgid "Administration"
+msgstr "الإدارة"
+
+#, fuzzy
+#| msgid "Hierarchy"
+msgid "Tenant Hierarchy"
+msgstr "التسلسل الهرمي للمستأجر"
+
+msgid "Open menu"
+msgstr "فتح القائمة"
+
+msgid "by"
+msgstr "بواسطة"
+
+msgid "Language"
+msgstr "اللغة"
+
+msgid "Choose tenant scope"
+msgstr "اختر نطاق المستأجر"
+
+msgid "(inactive)"
+msgstr "(غير نشط)"
+
+msgid ""
+"Tenants come from the database configured in DATABASES. If /admin lists "
+"tenants but this is empty, the app may be using a different DB (e.g. SQLite "
+"vs MySQL)."
+msgstr ""
+"المستأجرون من قاعدة البيانات في DATABASES. إذا كانت قائمة /admin تعرض "
+"مستأجرين وهنا فارغ، قد يستخدم التطبيق قاعدة مختلفة (مثل SQLite مقابل MySQL)."
+
+msgid "No tenants in DB"
+msgstr "لا مستأجرين في قاعدة البيانات"
+
+msgid "Tenant settings"
+msgstr "إعدادات المستأجر"
+
+msgid "Search directory"
+msgstr "بحث في الدليل"
+
+msgid "Search…"
+msgstr "بحث…"
+
+msgid "People, units, and positions in this tenant"
+msgstr "الأشخاص والوحدات والمناصب في هذا المستأجر"
+
+msgid "Sign out"
+msgstr "تسجيل الخروج"
+
+msgid "Sign in"
+msgstr "تسجيل الدخول"
+
+msgid "Main navigation"
+msgstr "التنقل الرئيسي"
+
+msgid "Expand menu"
+msgstr "توسيع القائمة"
+
+msgid "Toggle menu"
+msgstr "تبديل القائمة"
+
+msgid "Tenant"
+msgstr "المستأجر"
+
+msgid "Fluent-inspired UI"
+msgstr "واجهة مستوحاة من Fluent"
+
+msgid "Signed out"
+msgstr "تم تسجيل الخروج"
+
+msgid "You have been signed out."
+msgstr "تم تسجيل خروجك."
+
+msgid "Sign in again"
+msgstr "تسجيل الدخول مجددًا"
+
+msgid "Use your account to access Hierarchy."
+msgstr "استخدم حسابك للوصول إلى التسلسل الهرمي."

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}Audit log{% endblock %}
+{% block title %}{% trans "Audit log" %}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -13,7 +14,7 @@
 <div class="d365-card d365-card--wide d365-card--table-card">
   <div class="d365-card__header-row">
     <div>
-      <h1>Audit log</h1>
+      <h1>{% trans "Audit log" %}</h1>
       <p class="d365-card__subtitle">
         Records of HTTP requests and notable model and authentication events. Staff only.
       </p>
@@ -22,7 +23,7 @@
 
   <form method="get" action="{% url 'hierarchy:audit_log_list' %}" class="d365-form d365-form--inline" style="flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
     <div class="d365-field" style="margin-bottom: 0;">
-      <label class="d365-label" for="id-audit-action">Action</label>
+      
       <select name="action" id="id-audit-action" class="d365-select">
         <option value="">— All —</option>
         {% for ac in action_choices %}
@@ -31,11 +32,11 @@
       </select>
     </div>
     <div class="d365-field d365-field--grow" style="margin-bottom: 0; min-width: 200px;">
-      <label class="d365-label" for="id-audit-q">Search details</label>
+      
       <input type="search" name="q" id="id-audit-q" class="d365-input" value="{{ search_q }}" placeholder="Substring in details…" autocomplete="off">
     </div>
     <div class="d365-field" style="margin-bottom: 0; align-self: flex-end;">
-      <button type="submit" class="d365-btn d365-btn--primary">Apply</button>
+      <button type="submit" class="d365-btn d365-btn--primary">{% trans "Apply" %}</button>
     </div>
   </form>
 
@@ -73,11 +74,11 @@
     {% if page_obj.paginator.num_pages > 1 %}
     <nav class="d365-pagination" aria-label="Audit log pages" style="margin-top: 16px;">
       {% if page_obj.has_previous %}
-        <a class="d365-btn" href="{% if filter_query %}?{{ filter_query }}&{% else %}?{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+        <a class="d365-btn" href="{% if filter_query %}?{{ filter_query }}&{% else %}?{% endif %}page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a>
       {% endif %}
       <span class="d365-help" style="margin: 0 12px;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
       {% if page_obj.has_next %}
-        <a class="d365-btn" href="{% if filter_query %}?{{ filter_query }}&{% else %}?{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+        <a class="d365-btn" href="{% if filter_query %}?{{ filter_query }}&{% else %}?{% endif %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
       {% endif %}
     </nav>
     {% endif %}

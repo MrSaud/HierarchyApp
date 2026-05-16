@@ -4,3 +4,4 @@ Django>=4.2,<5
 Pillow>=10,<12
 PyMySQL>=1.1,<2
 mysqlclient>=2.2,<3 ; sys_platform != "darwin"
+polib>=1.2,<2

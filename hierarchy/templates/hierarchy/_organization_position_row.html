@@ -1,0 +1,16 @@
+<li class="d365-org-position">
+{% load i18n %}
+  <a href="{% url 'hierarchy:position_detail' p.pk %}" class="d365-org-position__title">{{ p.title }}</a>
+  {% if p.code %}<span class="d365-muted">({{ p.code }})</span>{% endif %}
+  {% if not p.is_active %}<span class="d365-pill d365-pill--muted">Inactive</span>{% endif %}
+  {% with cur=p.org_current_assignments %}
+    <span class="d365-org-position__people">
+      {% if cur %}
+        {% for a in cur %}{{ a.employee.user.get_full_name|default:a.employee.user.username }}{% if not forloop.last %}, {% endif %}{% endfor %}
+      {% else %}
+        <span class="d365-muted">Vacant</span>
+      {% endif %}
+    </span>
+    <a href="{% url 'hierarchy:position_assign_board' %}?position={{ p.pk }}" class="d365-link d365-org-position__assign">{% trans "Assign" %}</a>
+  {% endwith %}
+</li>

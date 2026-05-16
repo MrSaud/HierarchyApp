@@ -1,13 +1,14 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}Signed out{% endblock %}
+{% block title %}{% trans "Signed out" %}{% endblock %}
 
 {% block content %}
 <div class="d365-main--narrow">
   <div class="d365-card d365-card--auth">
-    <h1>Signed out</h1>
-    <p class="d365-card__lead">You have been signed out.</p>
-    <p><a class="d365-link d365-link--standalone" href="{% url 'login' %}">Sign in again</a></p>
+    <h1>{% trans "Signed out" %}</h1>
+    <p class="d365-card__lead">{% trans "You have been signed out." %}</p>
+    <p><a class="d365-link d365-link--standalone" href="{% url 'login' %}">{% trans "Sign in again" %}</a></p>
   </div>
 </div>
 {% endblock %}

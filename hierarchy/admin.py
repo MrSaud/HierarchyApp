@@ -5,7 +5,10 @@ from django.db.models import Q
 
 from .models import (
     AuditLog,
+    Delegation,
+    DelegationTemplate,
     Employee,
+    OrgUnitTypeDefinition,
     OrganizationalUnit,
     Position,
     PositionAssignment,
@@ -61,10 +64,30 @@ class PositionAssignmentInline(admin.TabularInline):
     autocomplete_fields = ("employee",)
 
 
+@admin.register(OrgUnitTypeDefinition)
+class OrgUnitTypeDefinitionAdmin(admin.ModelAdmin):
+    list_display = ("label", "slug", "tenant", "rank", "allows_root", "sort_order")
+    list_filter = ("tenant", "allows_root")
+    search_fields = ("label", "slug")
+    ordering = ("tenant__name", "sort_order", "rank")
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            st = get_superuser_active_tenant(request)
+            if st is not None:
+                return qs.filter(tenant_id=st.pk)
+            return qs.none()
+        tid = _staff_tenant_id(request)
+        if tid is None:
+            return qs.none()
+        return qs.filter(tenant_id=tid)
+
+
 @admin.register(OrganizationalUnit)
 class OrganizationalUnitAdmin(admin.ModelAdmin):
-    list_display = ("name", "tenant", "parent", "code", "sort_order")
-    list_filter = ("tenant",)
+    list_display = ("name", "tenant", "unit_type", "parent", "code", "sort_order")
+    list_filter = ("tenant", "unit_type")
     search_fields = ("name", "code")
     autocomplete_fields = ("parent",)
 
@@ -74,7 +97,7 @@ class OrganizationalUnitAdmin(admin.ModelAdmin):
             st = get_superuser_active_tenant(request)
             if st is not None:
                 return qs.filter(tenant_id=st.pk)
-            return qs
+            return qs.none()
         tid = _staff_tenant_id(request)
         if tid is None:
             return qs.none()
@@ -91,7 +114,7 @@ class OrganizationalUnitAdmin(admin.ModelAdmin):
             st = get_superuser_active_tenant(request)
             if st is not None:
                 return qs.filter(tenant_id=st.pk).order_by("sort_order", "name")
-            return qs.order_by("tenant__name", "sort_order", "name")
+            return OrganizationalUnit.objects.none()
         tid = _staff_tenant_id(request)
         if tid is None:
             return OrganizationalUnit.objects.none()
@@ -119,7 +142,7 @@ class PositionAdmin(admin.ModelAdmin):
             st = get_superuser_active_tenant(request)
             if st is not None:
                 return qs.filter(tenant_id=st.pk)
-            return qs
+            return qs.none()
         tid = _staff_tenant_id(request)
         if tid is None:
             return qs.none()
@@ -136,7 +159,7 @@ class PositionAdmin(admin.ModelAdmin):
                         "name",
                     )
                 else:
-                    kwargs["queryset"] = ou_qs.order_by("tenant__name", "sort_order", "name")
+                    kwargs["queryset"] = OrganizationalUnit.objects.none()
             else:
                 tid = _staff_tenant_id(request)
                 if tid is None:
@@ -146,6 +169,73 @@ class PositionAdmin(admin.ModelAdmin):
                         "sort_order",
                         "name",
                     )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(DelegationTemplate)
+class DelegationTemplateAdmin(admin.ModelAdmin):
+    list_display = ("name", "tenant", "default_duration_days", "default_is_full_substitute", "sort_order")
+    list_filter = ("tenant", "default_is_full_substitute")
+    search_fields = ("name", "description")
+    filter_horizontal = ("eligible_delegatee_positions",)
+    ordering = ("tenant__name", "sort_order", "name")
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            st = get_superuser_active_tenant(request)
+            if st is not None:
+                return qs.filter(tenant_id=st.pk)
+            return qs.none()
+        tid = _staff_tenant_id(request)
+        if tid is None:
+            return qs.none()
+        return qs.filter(tenant_id=tid)
+
+
+@admin.register(Delegation)
+class DelegationAdmin(admin.ModelAdmin):
+    list_display = (
+        "delegator",
+        "delegatee",
+        "tenant",
+        "start_date",
+        "end_date",
+        "is_full_substitute",
+        "template",
+        "created_at",
+    )
+    list_filter = ("tenant",)
+    search_fields = (
+        "delegator__user__username",
+        "delegatee__user__username",
+        "notes",
+    )
+    autocomplete_fields = ("delegator", "delegatee")
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related(
+            "tenant",
+            "delegator__user",
+            "delegatee__user",
+        )
+        if request.user.is_superuser:
+            st = get_superuser_active_tenant(request)
+            if st is not None:
+                return qs.filter(tenant_id=st.pk)
+            return qs.none()
+        tid = _staff_tenant_id(request)
+        if tid is None:
+            return qs.none()
+        return qs.filter(tenant_id=tid)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name in ("delegator", "delegatee"):
+            tid = _staff_tenant_id(request)
+            if tid is not None:
+                kwargs["queryset"] = Employee.objects.filter(tenant_id=tid).select_related(
+                    "user",
+                )
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
@@ -165,7 +255,7 @@ class PositionAssignmentAdmin(admin.ModelAdmin):
             st = get_superuser_active_tenant(request)
             if st is not None:
                 return qs.filter(position__tenant_id=st.pk)
-            return qs
+            return qs.none()
         tid = _staff_tenant_id(request)
         if tid is None:
             return qs.none()
@@ -262,7 +352,7 @@ class EmployeeAdmin(admin.ModelAdmin):
             st = get_superuser_active_tenant(request)
             if st is not None:
                 return qs.filter(tenant_id=st.pk)
-            return qs
+            return qs.none()
         tid = get_user_tenant_id(request.user)
         if tid is None:
             return qs.none()
@@ -271,6 +361,15 @@ class EmployeeAdmin(admin.ModelAdmin):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         tid = _staff_tenant_id(request)
         if request.user.is_superuser and tid is None:
+            if db_field.name in ("manager", "tenant", "user"):
+                if db_field.name == "manager":
+                    kwargs["queryset"] = Employee.objects.none()
+                elif db_field.name == "tenant":
+                    from .models import Tenant
+
+                    kwargs["queryset"] = Tenant.objects.none()
+                elif db_field.name == "user":
+                    kwargs["queryset"] = User.objects.none()
             return super().formfield_for_foreignkey(db_field, request, **kwargs)
         if tid is None:
             if db_field.name == "manager":

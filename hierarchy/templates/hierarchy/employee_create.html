@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}Create employee{% endblock %}
+{% block title %}{% trans "Create employee" %}{% endblock %}
 
 {% block content %}
 <div class="d365-card d365-card--wide d365-card--employee-form">
-  <h1>Create employee</h1>
-  <p class="d365-card__subtitle">Create an account and complete personal, contact, and employment details. After saving, you can add signature images on the next step.</p>
+  <h1>{% trans "Create employee" %}</h1>
+  <p class="d365-card__subtitle">{% trans "Create an account and complete personal, contact, and employment details. After saving, you can add signature images on the next step." %}</p>
 
   {% if user_form.non_field_errors or profile_form.non_field_errors %}
     <div class="d365-alert d365-alert--error" role="alert">
@@ -22,7 +23,7 @@
     {% csrf_token %}
 
     <section class="d365-form-section" aria-labelledby="sec-account">
-      <h2 class="d365-form-section__title" id="sec-account">Account access</h2>
+      <h2 class="d365-form-section__title" id="sec-account">{% trans "Account access" %}</h2>
       <div class="d365-field">
         <label class="d365-label" for="{{ user_form.tenant.id_for_label }}">{{ user_form.tenant.label }}</label>
         {{ user_form.tenant }}
@@ -49,8 +50,8 @@
     </section>
 
     <section class="d365-form-section" aria-labelledby="sec-personal">
-      <h2 class="d365-form-section__title" id="sec-personal">Personal information</h2>
-      <p class="d365-form-section__hint">Full name</p>
+      <h2 class="d365-form-section__title" id="sec-personal">{% trans "Personal information" %}</h2>
+      <p class="d365-form-section__hint">{% trans "Full name" %}</p>
       <div class="d365-field-row">
         <div class="d365-field">
           <label class="d365-label" for="{{ user_form.first_name.id_for_label }}">{{ user_form.first_name.label }}</label>
@@ -100,7 +101,7 @@
     </section>
 
     <section class="d365-form-section" aria-labelledby="sec-contact">
-      <h2 class="d365-form-section__title" id="sec-contact">Contact information</h2>
+      <h2 class="d365-form-section__title" id="sec-contact">{% trans "Contact information" %}</h2>
       <div class="d365-field">
         <label class="d365-label" for="{{ user_form.email.id_for_label }}">{{ user_form.email.label }}</label>
         {{ user_form.email }}
@@ -125,7 +126,7 @@
     </section>
 
     <section class="d365-form-section" aria-labelledby="sec-employment">
-      <h2 class="d365-form-section__title" id="sec-employment">Employment information</h2>
+      <h2 class="d365-form-section__title" id="sec-employment">{% trans "Employment information" %}</h2>
       <fieldset class="d365-fieldset">
         <legend class="d365-label">{{ profile_form.sector.label }}</legend>
         <div class="d365-radio-group">
@@ -188,9 +189,35 @@
       </div>
     </section>
 
+    <section class="d365-form-section" aria-labelledby="sec-bulk-csv">
+      <h2 class="d365-form-section__title" id="sec-bulk-csv">{% trans "Bulk import (CSV)" %}</h2>
+      <p class="d365-form-section__hint">
+        Upload a UTF-8 CSV whose columns match employee fields (aliases such as <code>emp_no</code>, <code>phone</code>, and <code>dob</code> are accepted).
+        Required columns: <code>username</code>, <code>email</code>, <code>first_name</code>, <code>last_name</code>, <code>employee_number</code>.
+        Either include a <code>password</code> column for each row or enable “Generate passwords” below (up to 500 data rows).
+        Optional: <code>sector</code>, <code>civil_id</code>, <code>date_of_birth</code>, <code>gender</code>, <code>marital_status</code>, <code>nationality</code>,
+        <code>mobile_number</code>, <code>home_address</code>, <code>emergency_contact</code>, <code>job_title</code>, <code>department</code>, <code>section_team</code>,
+        <code>hire_date</code>, <code>employment_status</code>, <code>work_location</code>, <code>employee_type</code>, <code>manager_username</code>, <code>manager_employee_number</code>.
+        Managers can be resolved after all rows are created; use the same tenant as above (superusers without an active tenant scope must pick <strong>Tenant</strong> under Account access first).
+      </p>
+      <div class="d365-field">
+        <label class="d365-label" for="employee_csv">{% trans "CSV file" %}</label>
+        <input id="employee_csv" class="d365-file-input" type="file" name="employee_csv" accept=".csv,text/csv">
+      </div>
+      <div class="d365-field">
+        <label class="d365-label d365-checkbox-label">
+          <input type="checkbox" name="generate_passwords" value="1">
+          {% trans "Generate passwords (omit password column)" %}
+        </label>
+      </div>
+      <div class="d365-form__actions d365-form__actions--compact">
+        <button type="submit" name="action" value="bulk_csv" class="d365-btn d365-btn--secondary" formnovalidate>{% trans "Import from CSV" %}</button>
+      </div>
+    </section>
+
     <div class="d365-form__actions">
-      <button type="submit" class="d365-btn d365-btn--primary">Create employee</button>
-      <a href="{% url 'hierarchy:employee_list' %}" class="d365-link d365-link--standalone">Cancel</a>
+      <button type="submit" class="d365-btn d365-btn--primary">{% trans "Create employee" %}</button>
+      <a href="{% url 'hierarchy:employee_list' %}" class="d365-link d365-link--standalone">{% trans "Cancel" %}</a>
     </div>
   </form>
 </div>

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load static i18n %}
+
+{% block title %}{% trans "Assign to positions" %}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/position-assign-board.css' %}?v=4">
+{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide d365-assign-board">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>{% trans "Assign employees to positions" %}</h1>
+      {% if structure_tenant %}
+      <p class="d365-card__subtitle">
+        {% trans "Tenant:" %} <strong>{{ structure_tenant.name }}</strong> —
+        {% trans "drag employees onto a position or use Assign / Remove. Multiple people can share a position." %}
+      </p>
+      {% else %}
+      <p class="d365-card__subtitle">{% trans "Drag employees onto a selected position to create assignments." %}</p>
+      {% endif %}
+    </div>
+    {% if structure_tenant %}
+    <div class="d365-card__actions">
+      <a href="{% url 'hierarchy:organization_overview' %}" class="d365-btn">{% trans "Organization" %}</a>
+      <a href="{% url 'hierarchy:position_list' %}" class="d365-btn">{% trans "Positions" %}</a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not structure_tenant %}
+    <p class="d365-help">{% trans "Superusers: pick" %} <strong>{% trans "Scope" %}</strong> {% trans "in the app bar. Tenant staff: uses your employee tenant automatically." %}</p>
+  {% elif not position_groups %}
+    <p class="d365-empty">{% trans "No positions yet." %} <a href="{% url 'hierarchy:position_create' %}">{% trans "Create a position" %}</a> {% trans "first." %}</p>
+  {% else %}
+    <div
+      id="position-assign-board"
+      class="d365-assign-board__layout"
+      data-selected-position="{{ selected_position_id|default:'' }}"
+      data-position-url-template="{{ position_data_url_template }}"
+      data-assign-url="{{ assign_url }}"
+      data-unassign-url="{{ unassign_url }}"
+    >
+      {% csrf_token %}
+      {{ board_employees|json_script:"board-employees-data" }}
+
+      <aside class="d365-assign-board__positions" aria-label="{% trans 'Positions' %}">
+        <h2 class="d365-assign-board__panel-title">{% trans "Positions" %}</h2>
+        <p class="d365-help">{% trans "Click a position to select it as the drop target." %}</p>
+        <div class="d365-assign-board__position-list" role="listbox" aria-label="{% trans 'Position list' %}">
+          {% for group in position_groups %}
+            <div class="d365-assign-board__ou-group">
+              <h3 class="d365-assign-board__ou-name">{{ group.ou_name }}</h3>
+              <ul class="d365-assign-board__ou-positions">
+                {% for p in group.positions %}
+                  <li>
+                    <button
+                      type="button"
+                      class="d365-assign-board__position-btn"
+                      data-position-id="{{ p.pk }}"
+                      data-position-title="{{ p.title }}"
+                      role="option"
+                      aria-selected="false"
+                    >
+                      <span class="d365-assign-board__position-title">{{ p.title }}</span>
+                      {% if p.code %}<span class="d365-muted">({{ p.code }})</span>{% endif %}
+                      {% if not p.is_active %}<span class="d365-pill d365-pill--muted">{% trans "Inactive" %}</span>{% endif %}
+                    </button>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
+        </div>
+      </aside>
+
+      <section class="d365-assign-board__pool" aria-labelledby="assign-pool-title">
+        <h2 class="d365-assign-board__panel-title" id="assign-pool-title">{% trans "Available employees" %}</h2>
+        <label class="d365-assign-board__search-wrap">
+          <span class="d365-label">{% trans "Filter" %}</span>
+          <input type="search" id="assign-board-search" class="d365-input" placeholder="{% trans 'Name or username…' %}" autocomplete="off">
+        </label>
+        <div
+          id="assign-board-pool"
+          class="d365-assign-board__dropzone d365-assign-board__dropzone--pool"
+          data-drop-zone="pool"
+          tabindex="0"
+          aria-label="{% trans 'Available employees — drag from here or drop here to unassign' %}"
+        >
+          <p class="d365-assign-board__zone-hint" id="assign-board-pool-hint">{% trans "Select a position to see who can be assigned." %}</p>
+          <ul id="assign-board-pool-list" class="d365-assign-board__chips" hidden></ul>
+        </div>
+      </section>
+
+      <section class="d365-assign-board__assigned" aria-labelledby="assign-target-title">
+        <h2 class="d365-assign-board__panel-title" id="assign-target-title">
+          {% trans "Assigned to" %} <span id="assign-board-position-label" class="d365-assign-board__target-name">—</span>
+        </h2>
+        <p class="d365-help" id="assign-board-position-meta"></p>
+        <label class="d365-assign-board__primary-opt" for="assign-board-primary">
+          <input type="checkbox" id="assign-board-primary" checked>
+          <span>{% trans "New assignments are primary roles" %}</span>
+        </label>
+        <p class="d365-help d365-assign-board__primary-hint">
+          {% trans "Only one primary assignment is kept per person; marking a new one as primary clears primary on their other positions." %}
+        </p>
+        <div
+          id="assign-board-target"
+          class="d365-assign-board__dropzone d365-assign-board__dropzone--target d365-assign-board__dropzone--disabled"
+          data-drop-zone="target"
+          tabindex="0"
+          aria-label="{% trans 'Assigned employees — drop here to assign' %}"
+          aria-disabled="true"
+        >
+          <p class="d365-assign-board__zone-hint" id="assign-board-target-hint">{% trans "Select a position on the left, then drag employees here." %}</p>
+          <ul id="assign-board-target-list" class="d365-assign-board__chips" hidden></ul>
+        </div>
+        <p id="assign-board-status" class="d365-assign-board__status" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/position-assign-board.js' %}?v=6" defer></script>
+{% endblock %}

@@ -11,7 +11,7 @@ def ensure_employee_access(request, employee: Employee) -> None:
     if request.user.is_superuser:
         st = get_superuser_active_tenant(request)
         if st is None:
-            return
+            raise PermissionDenied
         try:
             emp_tid = employee.tenant_id
         except AttributeError:
@@ -37,11 +37,25 @@ def ensure_tenant_manage(request, tenant) -> None:
         raise PermissionDenied
 
 
+def ensure_tenant_api_manage(request, tenant: Tenant) -> None:
+    """Staff on this tenant, or superuser with matching active Scope tenant."""
+    if not request.user.is_staff:
+        raise PermissionDenied
+    if request.user.is_superuser:
+        st = get_superuser_active_tenant(request)
+        if st is None or tenant.pk != st.pk:
+            raise PermissionDenied
+        return
+    tid = get_user_tenant_id(request.user)
+    if tid is None or tenant.pk != tid:
+        raise PermissionDenied
+
+
 def resolve_active_structure_tenant(request):
     """Tenant for org-structure UI; ``None`` when superuser has not scoped a tenant."""
     if request.user.is_superuser:
         return get_superuser_active_tenant(request)
-    return get_user_tenant(request)
+    return get_user_tenant(request.user)
 
 
 def ensure_structure_staff(request) -> None:

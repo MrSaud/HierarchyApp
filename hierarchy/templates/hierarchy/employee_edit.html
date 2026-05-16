@@ -1,12 +1,13 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}Edit employee{% endblock %}
+{% block title %}{% trans "Edit employee" %}{% endblock %}
 
 {% block content %}
 <div class="d365-card d365-card--wide d365-card--employee-form">
-  <h1>Edit employee</h1>
+  <h1>{% trans "Edit employee" %}</h1>
   <p class="d365-card__subtitle">Update account details, profile, and employment data for <strong>{{ employee.user.get_username }}</strong>. 
-    <a href="{% url 'hierarchy:signature_manage' employee.pk %}" class="d365-link">Manage signature images</a>
+    <a href="{% url 'hierarchy:signature_manage' employee.pk %}" class="d365-link">{% trans "Manage signature images" %}</a>
   </p>
 
   {% if user_form.non_field_errors or profile_form.non_field_errors %}
@@ -31,7 +32,7 @@
     {% csrf_token %}
 
     <section class="d365-form-section" aria-labelledby="sec-account">
-      <h2 class="d365-form-section__title" id="sec-account">Account</h2>
+      <h2 class="d365-form-section__title" id="sec-account">{% trans "Account" %}</h2>
       <div class="d365-field">
         <label class="d365-label" for="{{ user_form.username.id_for_label }}">{{ user_form.username.label }}</label>
         {{ user_form.username }}
@@ -69,7 +70,7 @@
     </section>
 
     <section class="d365-form-section" aria-labelledby="sec-personal">
-      <h2 class="d365-form-section__title" id="sec-personal">Personal information</h2>
+      <h2 class="d365-form-section__title" id="sec-personal">{% trans "Personal information" %}</h2>
       <p class="d365-form-section__hint">Full name</p>
       <div class="d365-field-row">
         <div class="d365-field">
@@ -114,7 +115,7 @@
     </section>
 
     <section class="d365-form-section" aria-labelledby="sec-contact">
-      <h2 class="d365-form-section__title" id="sec-contact">Contact information</h2>
+      <h2 class="d365-form-section__title" id="sec-contact">{% trans "Contact information" %}</h2>
       <div class="d365-field">
         <label class="d365-label" for="{{ profile_form.mobile_number.id_for_label }}">{{ profile_form.mobile_number.label }}</label>
         {{ profile_form.mobile_number }}
@@ -134,7 +135,7 @@
     </section>
 
     <section class="d365-form-section" aria-labelledby="sec-employment">
-      <h2 class="d365-form-section__title" id="sec-employment">Employment information</h2>
+      <h2 class="d365-form-section__title" id="sec-employment">{% trans "Employment information" %}</h2>
       <fieldset class="d365-fieldset">
         <legend class="d365-label">{{ profile_form.sector.label }}</legend>
         <div class="d365-radio-group">
@@ -198,16 +199,17 @@
     </section>
 
     <div class="d365-form__actions">
-      <button type="submit" class="d365-btn d365-btn--primary">Save changes</button>
-      <a href="{% url 'hierarchy:employee_list' %}" class="d365-link d365-link--standalone">Cancel</a>
+      <button type="submit" class="d365-btn d365-btn--primary">{% trans "Save changes" %}</button>
+      <a href="{% url 'hierarchy:employee_list' %}" class="d365-link d365-link--standalone">{% trans "Cancel" %}</a>
     </div>
   </form>
 
   <section class="d365-form-section d365-form-section--attached" aria-labelledby="sec-org-positions">
-    <h2 class="d365-form-section__title" id="sec-org-positions">Organization positions</h2>
+    <h2 class="d365-form-section__title" id="sec-org-positions">{% trans "Organization positions" %}</h2>
     <p class="d365-form-section__hint">
-      Formal roles defined under <a href="{% url 'hierarchy:organization_overview' %}">Organization</a>.
-      This is separate from the reporting manager below.
+      Formal roles under <a href="{% url 'hierarchy:organization_overview' %}">{% trans "Organization" %}</a>.
+      An employee may hold several positions at once.
+      Use <a href="{% url 'hierarchy:position_assign_board' %}">{% trans "Assign to positions" %}</a> for drag-and-drop assignment.
     </p>
 
     {% if position_assignments %}
@@ -216,7 +218,6 @@
           <li>
             <strong><a href="{% url 'hierarchy:position_detail' a.position.pk %}">{{ a.position.title }}</a></strong>
             {% if a.position.organizational_unit %}<span class="d365-muted"> — {{ a.position.organizational_unit.name }}</span>{% endif %}
-            {% if a.is_primary %}<span class="d365-pill">Primary</span>{% endif %}
             {% if a.start_date or a.end_date %}
               <span class="d365-muted">{{ a.start_date|default:"?" }} — {{ a.end_date|default:"open" }}</span>
             {% endif %}
@@ -224,7 +225,7 @@
             <form method="post" action="{% url 'hierarchy:position_assignment_delete' a.pk %}" class="d365-inline-form">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ request.path }}">
-              <button type="submit" class="d365-link d365-link--danger">Remove</button>
+              <button type="submit" class="d365-link d365-link--danger">{% trans "Remove" %}</button>
             </form>
           </li>
         {% endfor %}
@@ -249,7 +250,7 @@
         </div>
       {% endfor %}
       <div class="d365-form-actions">
-        <button type="submit" class="d365-btn d365-btn--primary">Add to position</button>
+        <button type="submit" class="d365-btn d365-btn--primary">{% trans "Add to position" %}</button>
       </div>
     </form>
     {% else %}

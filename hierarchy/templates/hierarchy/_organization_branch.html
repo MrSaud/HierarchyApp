@@ -1,32 +1,56 @@
-<div class="d365-structure-branch">
-  <div class="d365-structure-branch__head">
-    <h3 class="d365-structure-branch__title">{{ branch.unit.name }}</h3>
-    {% if branch.unit.code %}<span class="d365-muted">({{ branch.unit.code }})</span>{% endif %}
-    <a href="{% url 'hierarchy:org_unit_edit' branch.unit.pk %}" class="d365-link d365-link--compact">Edit unit</a>
+{% with depth=depth|default:0 %}
+{% load i18n %}
+<article
+  class="d365-org-unit d365-org-unit--depth-{{ depth }}{% if branch.has_body %} is-collapsed{% endif %}"
+  id="org-unit-{{ branch.unit.pk }}"
+  data-unit-id="{{ branch.unit.pk }}"
+  data-search="{{ branch.unit.name }} {% if branch.unit.code %}{{ branch.unit.code }} {% endif %}"
+>
+  <div class="d365-org-unit__head">
+    {% if branch.has_body %}
+      <button
+        type="button"
+        class="d365-org-unit__toggle"
+        aria-expanded="false"
+        aria-controls="org-unit-body-{{ branch.unit.pk }}"
+        title="Expand unit"
+      >
+        <span class="d365-org-unit__chevron" aria-hidden="true"></span>
+        <span class="d365-visually-hidden">Toggle</span>
+      </button>
+    {% else %}
+      <span class="d365-org-unit__toggle-spacer" aria-hidden="true"></span>
+    {% endif %}
+    <h3 class="d365-org-unit__title">{{ branch.unit.name }}</h3>
+    <span class="d365-pill d365-pill--muted d365-org-unit__type">{{ branch.unit.get_unit_type_display }}</span>
+    {% if branch.unit.code %}<span class="d365-org-unit__code">{{ branch.unit.code }}</span>{% endif %}
+    <span class="d365-org-unit__actions">
+      <a
+        href="{% url 'hierarchy:org_unit_create' %}?parent={{ branch.unit.pk }}&amp;next=overview"
+        class="d365-link d365-link--compact"
+      >{% trans "Add sub-unit" %}</a>
+      <a href="{% url 'hierarchy:org_unit_edit' branch.unit.pk %}" class="d365-link d365-link--compact">{% trans "Edit" %}</a>
+    </span>
   </div>
 
-  {% if branch.positions %}
-  <ul class="d365-structure-positions">
-    {% for p in branch.positions %}
-      <li>
-        <a href="{% url 'hierarchy:position_detail' p.pk %}">{{ p.title }}</a>
-        {% if p.code %}<span class="d365-muted">({{ p.code }})</span>{% endif %}
-        {% if not p.is_active %}<span class="d365-pill d365-pill--muted">Inactive</span>{% endif %}
-        {% with cur=p.org_current_assignments %}
-          {% if cur %}
-            <span class="d365-structure-assignees">— {% for a in cur %}<span>{{ a.employee.user.get_full_name|default:a.employee.user.username }}{% if a.is_primary %} <abbr title="Primary position">*</abbr>{% endif %}{% if not forloop.last %}, {% endif %}</span>{% endfor %}</span>
-          {% else %}
-            <span class="d365-structure-assignees d365-structure-assignees--empty">— vacant</span>
-          {% endif %}
-        {% endwith %}
-      </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
+  {% if branch.has_body %}
+  <div class="d365-org-unit__body" id="org-unit-body-{{ branch.unit.pk }}">
+    {% if branch.positions %}
+      <ul class="d365-org-positions d365-org-positions--nested">
+        {% for p in branch.positions %}
+          {% include "hierarchy/_organization_position_row.html" with p=p %}
+        {% endfor %}
+      </ul>
+    {% endif %}
 
-  {% for child in branch.children %}
-    <div class="d365-structure-branch__nested">
-      {% include "hierarchy/_organization_branch.html" with branch=child %}
-    </div>
-  {% endfor %}
-</div>
+    {% if branch.children %}
+      <div class="d365-org-unit__children">
+        {% for child in branch.children %}
+          {% include "hierarchy/_organization_branch.html" with branch=child depth=depth|add:1 %}
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</article>
+{% endwith %}

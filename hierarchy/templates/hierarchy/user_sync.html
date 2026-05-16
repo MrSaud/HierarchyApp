@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Sync users{% endblock %}
+{% block title %}{% trans "Sync users" %}{% endblock %}
 
 {% block content %}
 <div class="d365-card d365-card--wide">
-  <h1>Sync users from API</h1>
+  <h1>{% trans "Sync users from API" %}</h1>
   <p class="d365-card__subtitle">
     Calls <code class="d365-code">GET /api/auth/users</code> on the tenant’s API base (same host as health checks),
     then creates or updates login accounts, assigns them to this tenant, and creates an
@@ -32,7 +32,7 @@
     {% csrf_token %}
     {% if user.is_superuser %}
     <div class="d365-field">
-      <label class="d365-label" for="id_tenant_slug">Tenant API (slug)</label>
+      
       <select name="tenant_slug" id="id_tenant_slug" class="d365-select">
         <option value="">— Use app bar scope —</option>
         {% for t in tenant_choices %}
@@ -45,15 +45,15 @@
 
     <div class="d365-field-row">
       <div class="d365-field">
-        <label class="d365-label" for="id_search">search</label>
+        
         <input type="text" name="search" id="id_search" class="d365-input" value="{{ search_q }}" placeholder="Optional filter" maxlength="200" autocomplete="off">
       </div>
       <div class="d365-field">
-        <label class="d365-label" for="id_username">username</label>
+        
         <input type="text" name="username" id="id_username" class="d365-input" value="{{ username_q }}" placeholder="Optional exact username" maxlength="150" autocomplete="off">
       </div>
       <div class="d365-field">
-        <label class="d365-label" for="id_take">take</label>
+        
         <input type="number" name="take" id="id_take" class="d365-input" value="{{ take_q }}" min="1" max="500" step="1">
       </div>
     </div>
@@ -75,15 +75,15 @@
     </div>
 
     <div class="d365-form__actions">
-      <button type="submit" class="d365-btn d365-btn--primary">Run sync</button>
-      <a href="{% url 'hierarchy:index' %}" class="d365-link d365-link--standalone">Home</a>
+      <button type="submit" class="d365-btn d365-btn--primary">{% trans "Run sync" %}</button>
+      <a href="{% url 'hierarchy:index' %}" class="d365-link d365-link--standalone">{% trans "Home" %}</a>
     </div>
   </form>
 
   <div id="sync-result-root">
     {% if last_stats %}
     <section class="d365-form-section d365-form-section--attached" aria-labelledby="sec-sync-result">
-      <h2 class="d365-form-section__title" id="sec-sync-result">Last run</h2>
+      <h2 class="d365-form-section__title" id="sec-sync-result">{% trans "Last run" %}</h2>
       <ul class="d365-help">
         <li>Remote rows parsed: {{ last_row_count }}</li>
         <li>Users created: {{ last_stats.created }}</li>

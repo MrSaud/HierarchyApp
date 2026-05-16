@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Unit types" %}{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide d365-card--table-card">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>{% trans "Organizational unit types" %}</h1>
+      {% if structure_tenant %}
+      <p class="d365-card__subtitle">
+        Tenant: <strong>{{ structure_tenant.name }}</strong> —
+        labels, hierarchy rank, and which types may be top-level.
+      </p>
+      {% else %}
+      <p class="d365-card__subtitle">Customize the unit type catalog for each tenant.</p>
+      {% endif %}
+    </div>
+    {% if structure_tenant %}
+    <div class="d365-card__actions">
+      <a href="{% url 'hierarchy:org_unit_list' %}" class="d365-btn">{% trans "Units" %}</a>
+      <a href="{% url 'hierarchy:org_unit_type_create' %}" class="d365-btn d365-btn--primary">{% trans "New type" %}</a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not structure_tenant %}
+    <p class="d365-help">Superusers: pick <strong>Scope</strong> in the app bar. Tenant staff: uses your employee tenant automatically.</p>
+  {% elif not unit_types %}
+    <p class="d365-empty">No unit types yet. <a href="{% url 'hierarchy:org_unit_type_create' %}">{% trans "Create one" %}</a>.</p>
+  {% else %}
+    <form method="post" action="{% url 'hierarchy:org_unit_type_restore_defaults' %}" class="d365-inline-form d365-mb">
+      {% csrf_token %}
+      <button type="submit" class="d365-btn">{% trans "Restore missing defaults" %}</button>
+    </form>
+    <div class="d365-table-wrap">
+      <table class="d365-table">
+        <thead>
+          <tr>
+            <th scope="col">Label</th>
+            <th scope="col">Slug</th>
+            <th scope="col">Rank</th>
+            <th scope="col">Top-level</th>
+            <th scope="col">Sort</th>
+            <th scope="col">In use</th>
+            <th scope="col"><span class="d365-visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in unit_types %}
+            {% with t=row.obj %}
+            <tr>
+              <td><strong>{{ t.label }}</strong></td>
+              <td><code class="d365-code">{{ t.slug }}</code></td>
+              <td>{{ t.rank }}</td>
+              <td>{% if t.allows_root %}Yes{% else %}—{% endif %}</td>
+              <td>{{ t.sort_order }}</td>
+              <td>
+                {% if row.in_use %}
+                  <span class="d365-pill">Yes</span>
+                {% else %}
+                  <span class="d365-pill d365-pill--muted">No</span>
+                {% endif %}
+              </td>
+              <td class="d365-table__actions">
+                <a href="{% url 'hierarchy:org_unit_type_edit' t.pk %}" class="d365-link">{% trans "Edit" %}</a>
+                {% if not row.in_use %}
+                <form method="post" action="{% url 'hierarchy:org_unit_type_delete' t.pk %}" class="d365-inline-form" onsubmit="return confirm('Remove this unit type?');">
+                  {% csrf_token %}
+                  <button type="submit" class="d365-link d365-link--danger">{% trans "Remove" %}</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="d365-help d365-mt">
+      Lower <strong>rank</strong> means higher in the hierarchy. A child unit’s type must have a higher rank than its parent’s type.
+      Types in use cannot be removed until no units reference them.
+    </p>
+  {% endif %}
+</div>
+{% endblock %}

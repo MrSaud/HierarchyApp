@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}API access — {{ tenant.name }}{% endblock %}
+
+{% block content %}
+<div class="d365-card d365-card--wide">
+  <div class="d365-card__header-row">
+    <div>
+      <h1>{% trans "API access" %}</h1>
+      <p class="d365-card__subtitle">
+        {{ tenant.name }} · <code class="d365-code">{{ tenant.slug }}</code>
+        · tenant id <code class="d365-code">{{ tenant.pk }}</code>
+      </p>
+    </div>
+    <div class="d365-card__actions">
+      <a href="{% url 'hierarchy:api_guide' %}" class="d365-btn">{% trans "API guide" %}</a>
+      {% if can_manage_tenant_record %}
+        <a href="{% url 'hierarchy:tenant_edit' tenant.pk %}" class="d365-btn">{% trans "Edit tenant" %}</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <p class="d365-help">
+    Generate a secret for integrations calling this app's APIs
+    (<code class="d365-code">GET /api/employees/</code>,
+    <code class="d365-code">GET /api/organization/units/</code>,
+    <code class="d365-code">POST /api/auth/users/</code>).
+    Send it on every request using the header below. Staff on this tenant can manage the token here.
+  </p>
+
+  {% if new_token %}
+  <div class="d365-alert d365-alert--warning" role="alert">
+    <p><strong>Copy this token now.</strong> It will not be shown again after you leave this page.</p>
+    <pre class="d365-pre" id="tenant-api-token">{{ new_token }}</pre>
+    <button type="button" class="d365-btn" id="copy-tenant-api-token">{% trans "Copy token" %}</button>
+  </div>
+  {% endif %}
+
+  <section class="d365-form-section">
+    <h2 class="d365-form-section__title">{% trans "Token status" %}</h2>
+    {% if has_api_key %}
+      <p class="d365-help">
+        A token is <strong>configured</strong> for this tenant
+        (stored on the server; the value is never displayed except right after generation).
+      </p>
+    {% else %}
+      <p class="d365-help">No token is configured. Generate one before external systems can call the API.</p>
+    {% endif %}
+
+    <div class="d365-form__actions">
+      <form method="post" action="">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="generate">
+        <button type="submit" class="d365-btn d365-btn--primary">
+          {% if has_api_key %}Regenerate token{% else %}Generate token{% endif %}
+        </button>
+      </form>
+      {% if has_api_key %}
+      <form method="post" action="" onsubmit="return confirm('Revoke the API token? Integrations will stop working until you generate a new one.');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="revoke">
+        <button type="submit" class="d365-btn">{% trans "Revoke token" %}</button>
+      </form>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="d365-form-section">
+    <h2 class="d365-form-section__title">{% trans "How to call the API" %}</h2>
+    <p class="d365-help">Header name: <code class="d365-code">{{ api_key_header }}</code></p>
+    <pre class="d365-pre">curl -sS "{{ site_api_base }}/api/employees/?tenant_id={{ tenant.pk }}&amp;username=jdoe" \
+  -H "{{ api_key_header }}: &lt;your-token&gt;"</pre>
+    <pre class="d365-pre">curl -sS "{{ site_api_base }}/api/organization/units/?tenant_id={{ tenant.pk }}&amp;format=flat" \
+  -H "{{ api_key_header }}: &lt;your-token&gt;"</pre>
+    <pre class="d365-pre">curl -sS -X POST "{{ site_api_base }}/api/auth/users/" \
+  -H "Content-Type: application/json" \
+  -H "{{ api_key_header }}: &lt;your-token&gt;" \
+  -d '{"samAccountName":"jdoe","password":"SecurePass1!","givenName":"Jane","surname":"Doe","tenant":"{{ tenant.slug }}"}'</pre>
+  </section>
+
+  <section class="d365-form-section">
+    <h2 class="d365-form-section__title">{% trans "Custom header name" %}</h2>
+    <form method="post" class="d365-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="header">
+      <div class="d365-field">
+        <label class="d365-label" for="{{ header_form.api_key_header.id_for_label }}">{{ header_form.api_key_header.label }}</label>
+        {{ header_form.api_key_header }}
+        {% if header_form.api_key_header.help_text %}<p class="d365-help">{{ header_form.api_key_header.help_text }}</p>{% endif %}
+      </div>
+      <button type="submit" class="d365-btn">{% trans "Save header name" %}</button>
+    </form>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if new_token %}
+<script>
+(function () {
+  const btn = document.getElementById("copy-tenant-api-token");
+  const pre = document.getElementById("tenant-api-token");
+  if (!btn || !pre) return;
+  btn.addEventListener("click", function () {
+    navigator.clipboard.writeText(pre.textContent.trim()).then(function () {
+      btn.textContent = "Copied";
+    });
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}
