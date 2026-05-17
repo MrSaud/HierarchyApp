@@ -12,9 +12,9 @@
   </p>
   <p class="d365-help api-guide-intro">
     <strong>{{ api_external_section }}</strong> is separate: Hierarchy connects to each tenant’s AD server
-    for <a href="{% url 'hierarchy:api_health_test' %}">{% trans "health" %}</a> and
+    for {% trans "health" %} and
     <a href="{% url 'hierarchy:user_sync' %}">{% trans "user sync" %}</a>
-    (configure on <strong>{{ api_external_section }}</strong> in Administration).
+    (configure on <strong>{{ api_external_section }}</strong> in Administration — health runs on that page).
     This guide covers the <strong>internal API</strong> only.
     Integrations should call <strong>versioned</strong>
     <code class="d365-code">/api/v1/…</code> reads for stable JSON, weak
@@ -196,7 +196,7 @@
 
   <div class="d365-form__actions">
     <a href="{% url 'hierarchy:tenant_api_access' %}" class="d365-link">{% trans "API access (tokens)" %}</a>
-    <a href="{% url 'hierarchy:api_health_test' %}" class="d365-link">{% trans "API health (external)" %}</a>
+    <a href="{% url 'hierarchy:tenant_api_access' %}" class="d365-link">{{ api_external_section }}</a>
     <a href="{% url 'hierarchy:index' %}" class="d365-link d365-link--standalone">{% trans "Home" %}</a>
   </div>
 </div>

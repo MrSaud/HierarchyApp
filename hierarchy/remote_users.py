@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import secrets
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,6 +26,7 @@ from .models import (
     Sector,
     Tenant,
 )
+from .api_usage import record_outbound_api_usage
 from .tenant_api_credentials import (
     merge_outbound_api_headers,
     tenant_outbound_api_key,
@@ -73,6 +75,11 @@ def tenant_external_login_active(tenant: Tenant) -> bool:
     return bool(
         tenant_external_api_configured(tenant) and getattr(tenant, "external_login_enabled", True)
     )
+
+
+def external_health_url(base: str) -> str:
+    """``{base}/api/health`` on the tenant external API (AD) server."""
+    return f"{base.strip().rstrip('/')}/api/health"
 
 
 def external_users_url(base: str) -> str:
@@ -129,12 +136,86 @@ def build_users_list_url(
     return f"{url}?{urllib.parse.urlencode(params)}"
 
 
+def probe_external_api_health(tenant: Tenant) -> dict[str, Any]:
+    """
+    GET ``{external_base}/api/health`` using the tenant outbound ApiKey.
+
+    Uses :func:`resolve_tenant_api_base` (same base as sync and login).
+    """
+    timeout = getattr(settings, "EXTERNAL_API_HEALTH_TIMEOUT", 10)
+    base = resolve_tenant_api_base(tenant)
+    if not base:
+        return {
+            "configured": False,
+            "health_url": "",
+            "timeout_seconds": timeout,
+            "success": False,
+            "error": "External API base URL is not configured for this tenant.",
+        }
+
+    url = external_health_url(base)
+    result: dict[str, Any] = {
+        "configured": True,
+        "health_url": url,
+        "timeout_seconds": timeout,
+    }
+    t0 = time.monotonic()
+    try:
+        headers = merge_outbound_api_headers({"Accept": "application/json"}, tenant)
+        req = urllib.request.Request(url, method="GET", headers=headers)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body_bytes = resp.read()
+            elapsed_ms = int((time.monotonic() - t0) * 1000)
+            body_text = body_bytes.decode("utf-8", errors="replace")
+            result["http_status"] = resp.status
+            result["elapsed_ms"] = elapsed_ms
+            result["success"] = True
+            try:
+                parsed = json.loads(body_text)
+                result["json_body"] = parsed
+                result["json_body_pretty"] = json.dumps(
+                    parsed, indent=2, ensure_ascii=False
+                )
+            except json.JSONDecodeError:
+                result["raw_body"] = body_text
+    except urllib.error.HTTPError as e:
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        result["success"] = False
+        result["http_status"] = e.code
+        result["elapsed_ms"] = elapsed_ms
+        result["error"] = e.reason or f"HTTP {e.code}"
+        try:
+            result["raw_body"] = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+    except urllib.error.URLError as e:
+        result["success"] = False
+        result["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
+        reason = getattr(e, "reason", e)
+        result["error"] = str(reason)
+    except TimeoutError:
+        result["success"] = False
+        result["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
+        result["error"] = "Request timed out."
+    except Exception as e:
+        result["success"] = False
+        result["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
+        result["error"] = str(e)
+    record_outbound_api_usage(
+        tenant,
+        "health",
+        is_error=not result.get("success"),
+    )
+    return result
+
+
 def fetch_remote_users_json(
     url: str,
     *,
     tenant: Tenant | None = None,
     json_body: bytes | None = None,
     timeout: int | None = None,
+    usage_operation: str | None = None,
 ) -> object:
     """
     ``GET`` remote URL with tenant ApiKey / ApiKeyHeader.
@@ -150,13 +231,22 @@ def fetch_remote_users_json(
     if json_body is not None:
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, method="GET", headers=headers, data=json_body)
+    op = usage_operation
+
+    def _record(*, is_error: bool) -> None:
+        if op and tenant is not None:
+            record_outbound_api_usage(tenant, op, is_error=is_error)
+
     try:
         with urllib.request.urlopen(req, timeout=to) as resp:
             body = resp.read().decode("utf-8", errors="replace")
             if not body.strip():
+                _record(is_error=False)
                 return []
+            _record(is_error=False)
             return json.loads(body)
     except urllib.error.HTTPError as e:
+        _record(is_error=True)
         detail = ""
         try:
             detail = e.read().decode("utf-8", errors="replace")[:500]
@@ -166,8 +256,10 @@ def fetch_remote_users_json(
             f"Remote API returned HTTP {e.code}. {detail or e.reason}"
         ) from e
     except urllib.error.URLError as e:
+        _record(is_error=True)
         raise RemoteUserSyncError(f"Network error: {e}") from e
     except json.JSONDecodeError as e:
+        _record(is_error=True)
         raise RemoteUserSyncError(f"Invalid JSON from remote API: {e}") from e
 
 
@@ -194,7 +286,12 @@ def verify_external_login(
     url = external_users_url(base)
     body = build_external_login_request_body(username=username, password=password)
     try:
-        payload = fetch_remote_users_json(url, tenant=tenant, json_body=body)
+        payload = fetch_remote_users_json(
+            url,
+            tenant=tenant,
+            json_body=body,
+            usage_operation="ad_login",
+        )
     except RemoteUserSyncError as exc:
         msg = str(exc)
         if "HTTP 401" in msg or "HTTP 403" in msg:

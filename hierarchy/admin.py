@@ -13,11 +13,43 @@ from .models import (
     Position,
     PositionAssignment,
     Tenant,
+    TenantApiUsageDaily,
 )
 from .tenant_scope import get_superuser_active_tenant
 from .user_tenant import get_user_tenant_id
 
 User = get_user_model()
+
+
+@admin.register(TenantApiUsageDaily)
+class TenantApiUsageDailyAdmin(admin.ModelAdmin):
+    list_display = (
+        "date",
+        "tenant",
+        "direction",
+        "operation",
+        "request_count",
+        "error_count",
+        "last_request_at",
+    )
+    list_filter = ("direction", "date", "tenant")
+    search_fields = ("operation", "tenant__name", "tenant__slug")
+    readonly_fields = (
+        "tenant",
+        "date",
+        "direction",
+        "operation",
+        "request_count",
+        "error_count",
+        "last_request_at",
+    )
+    date_hierarchy = "date"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(AuditLog)

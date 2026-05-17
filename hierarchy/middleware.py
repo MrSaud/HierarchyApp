@@ -1,9 +1,25 @@
-"""HTTP request audit logging (every view access)."""
+"""HTTP request audit logging and inbound API usage counters."""
 
 import time
 
+from .api_usage import maybe_record_inbound_api_request
 from .audit_context import bind_audit_request, clear_audit_request
 from .audit_store import record_audit
+
+
+class TenantApiUsageMiddleware:
+    """Count inbound /api/ calls per tenant (daily aggregates)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        try:
+            maybe_record_inbound_api_request(request, response)
+        except Exception:
+            pass
+        return response
 
 
 class AuditMiddleware:

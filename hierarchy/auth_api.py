@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from .api_auth import authorize_tenant_api
+from .api_usage import record_inbound_api_usage
 from .employee_api import build_employee_api_payload, employee_detail_queryset
 from .models import Employee, Sector, Tenant
 from .remote_users import (
@@ -109,6 +110,7 @@ def _login_json_response(
     body: dict = {"detail": detail, "auth": auth}
     if extra:
         body.update(extra)
+    record_inbound_api_usage(tenant, "api_login", is_error=status >= 400)
     return JsonResponse(body, status=status)
 
 
@@ -177,6 +179,7 @@ def _complete_login_response(
     payload = build_employee_api_payload(emp)
     payload["detail"] = "Logged in."
     payload["auth"] = auth
+    record_inbound_api_usage(tenant, "api_login", is_error=False)
     return JsonResponse(payload, status=200)
 
 
@@ -232,21 +235,25 @@ def api_users(request):
     if tenant is None:
         return JsonResponse({"detail": "Unknown or inactive tenant."}, status=400)
 
+    def _users_response(body: dict, status: int) -> JsonResponse:
+        record_inbound_api_usage(tenant, "api_users", is_error=status >= 400)
+        return JsonResponse(body, status=status)
+
     if not authorize_tenant_api(request, tenant):
-        return JsonResponse(
+        return _users_response(
             {
                 "detail": "Authentication required. Send this tenant's API key "
                 "(default header X-Api-Key) or use a staff session for the same tenant.",
             },
-            status=401,
+            401,
         )
 
     try:
         validate_password(password, user=None)
     except DjangoValidationError as e:
-        return JsonResponse(
+        return _users_response(
             {"detail": "Password validation failed.", "errors": list(e.messages)},
-            status=400,
+            400,
         )
 
     user = User.objects.create_user(
@@ -260,7 +267,7 @@ def api_users(request):
         tenant=tenant,
         sector=Sector.GOVERNMENT,
     )
-    return JsonResponse(
+    return _users_response(
         {
             "detail": "User created.",
             "user": {
@@ -277,7 +284,7 @@ def api_users(request):
                 },
             },
         },
-        status=201,
+        201,
     )
 
 

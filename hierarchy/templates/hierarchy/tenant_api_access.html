@@ -14,7 +14,6 @@
       </p>
     </div>
     <div class="d365-card__actions">
-      <a href="{% url 'hierarchy:api_health_test' %}?tenant={{ tenant.slug }}" class="d365-btn">{% trans "API health" %}</a>
       <a href="{% url 'hierarchy:user_sync' %}" class="d365-btn">{% trans "Sync users" %}</a>
       <a href="{% url 'hierarchy:api_guide' %}" class="d365-btn">{% trans "API guide" %}</a>
       {% if can_manage_tenant_record %}
@@ -49,6 +48,7 @@
       </dd>
     </div>
   </dl>
+
 
   {% if new_token %}
   <div class="d365-alert d365-alert--warning" role="alert">
@@ -150,10 +150,151 @@
     </div>
   </section>
 
+  {% if health_probe %}
+  <section class="d365-form-section" aria-labelledby="ext-section-health">
+    <h2 class="d365-form-section__title" id="ext-section-health">{% trans "API health" %}</h2>
+    <p class="d365-help">
+      {% trans "Server-side GET to" %} <code class="d365-code">/api/health</code>
+      {% trans "on this tenant's external API base URL (same host as sync and login)." %}
+    </p>
+
+    {% if health_probe.configured %}
+    <div class="d365-health-meta">
+      <p><strong>{% trans "URL" %}:</strong> <code class="d365-code">{{ health_probe.health_url }}</code></p>
+      <p><strong>{% trans "Timeout" %}:</strong> {{ health_probe.timeout_seconds }}s</p>
+      {% if health_probe.elapsed_ms is not None %}
+        <p><strong>{% trans "Latency" %}:</strong> {{ health_probe.elapsed_ms }} ms</p>
+      {% endif %}
+    </div>
+
+    {% if health_probe.success %}
+      <div class="d365-health-status d365-health-status--ok" role="status">
+        <span class="d365-health-status__label">OK</span>
+        {% if health_probe.http_status %}
+          <span class="d365-health-status__detail">HTTP {{ health_probe.http_status }}</span>
+        {% endif %}
+      </div>
+      {% if health_probe.json_body_pretty %}
+        <pre class="d365-pre">{{ health_probe.json_body_pretty }}</pre>
+      {% elif health_probe.raw_body %}
+        <pre class="d365-pre">{{ health_probe.raw_body }}</pre>
+      {% endif %}
+    {% else %}
+      <div class="d365-health-status d365-health-status--fail" role="alert">
+        <span class="d365-health-status__label">{% trans "Failed" %}</span>
+        {% if health_probe.error %}<span class="d365-health-status__detail">{{ health_probe.error }}</span>{% endif %}
+      </div>
+      {% if health_probe.raw_body %}
+        <pre class="d365-pre">{{ health_probe.raw_body }}</pre>
+      {% endif %}
+    {% endif %}
+
+    <div class="d365-form__actions" style="margin-top: 12px;">
+      {% if can_manage_tenant_record %}
+        <a href="{% url 'hierarchy:tenant_api_access_for' tenant.pk %}" class="d365-btn d365-btn--primary">{% trans "Run again" %}</a>
+      {% else %}
+        <a href="{% url 'hierarchy:tenant_api_access' %}" class="d365-btn d365-btn--primary">{% trans "Run again" %}</a>
+      {% endif %}
+      {% if health_probe.health_url %}
+        <a href="{{ health_probe.health_url }}" target="_blank" rel="noopener noreferrer" class="d365-link">{% trans "Open raw URL" %}</a>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="d365-help d365-help__muted">{{ health_probe.error }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="d365-form-section" aria-labelledby="ext-section-usage">
+    <h2 class="d365-form-section__title" id="ext-section-usage">{% trans "API usage statistics" %}</h2>
+    <p class="d365-help">
+      {% blocktrans with days=api_usage.days %}Daily counters for the last {{ days }} days (including today).{% endblocktrans %}
+    </p>
+    <p class="d365-help">
+      <strong>{% trans "Today" %}:</strong>
+      {% trans "Inbound" %} {{ api_usage.today_inbound }} ·
+      {% trans "Outbound" %} {{ api_usage.today_outbound }}
+      &nbsp;|&nbsp;
+      <strong>{% trans "Period total" %}:</strong>
+      {% trans "Inbound" %} {{ api_usage.period_inbound }} ·
+      {% trans "Outbound" %} {{ api_usage.period_outbound }}
+      {% if api_usage.last_inbound_at or api_usage.last_outbound_at %}
+      <br>
+      <strong>{% trans "Last request" %}:</strong>
+      {% if api_usage.last_inbound_at %}{% trans "Inbound" %} {{ api_usage.last_inbound_at|date:"Y-m-d H:i" }}{% endif %}
+      {% if api_usage.last_inbound_at and api_usage.last_outbound_at %} · {% endif %}
+      {% if api_usage.last_outbound_at %}{% trans "Outbound" %} {{ api_usage.last_outbound_at|date:"Y-m-d H:i" }}{% endif %}
+      {% endif %}
+    </p>
+
+    {% if api_usage.has_data %}
+    <h3 class="d365-form-section__subtitle">{% trans "Inbound" %} <span class="d365-help__muted">({% trans "other systems → Hierarchy" %})</span></h3>
+    {% if api_usage.inbound %}
+    <div class="d365-table-wrap">
+      <table class="d365-table d365-table--compact">
+        <thead>
+          <tr>
+            <th scope="col">{% trans "API" %}</th>
+            <th scope="col">{% trans "Today" %}</th>
+            <th scope="col">{% trans "30-day total" %}</th>
+            <th scope="col">{% trans "Errors (30d)" %}</th>
+            <th scope="col">{% trans "Last request" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in api_usage.inbound %}
+          <tr>
+            <td><code class="d365-code">{{ row.label }}</code></td>
+            <td>{{ row.today }}</td>
+            <td>{{ row.period_total }}</td>
+            <td>{{ row.period_errors }}</td>
+            <td>{% if row.last_request_at %}{{ row.last_request_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="d365-help d365-help__muted">{% trans "No inbound API calls recorded yet." %}</p>
+    {% endif %}
+
+    <h3 class="d365-form-section__subtitle" style="margin-top: 1.25rem;">{% trans "Outbound" %} <span class="d365-help__muted">({% trans "Hierarchy → AD" %})</span></h3>
+    {% if api_usage.outbound %}
+    <div class="d365-table-wrap">
+      <table class="d365-table d365-table--compact">
+        <thead>
+          <tr>
+            <th scope="col">{% trans "Operation" %}</th>
+            <th scope="col">{% trans "Today" %}</th>
+            <th scope="col">{% trans "30-day total" %}</th>
+            <th scope="col">{% trans "Errors (30d)" %}</th>
+            <th scope="col">{% trans "Last request" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in api_usage.outbound %}
+          <tr>
+            <td><code class="d365-code">{{ row.label }}</code></td>
+            <td>{{ row.today }}</td>
+            <td>{{ row.period_total }}</td>
+            <td>{{ row.period_errors }}</td>
+            <td>{% if row.last_request_at %}{{ row.last_request_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="d365-help d365-help__muted">{% trans "No outbound AD calls recorded yet." %}</p>
+    {% endif %}
+    {% else %}
+    <p class="d365-help d365-help__muted">{% trans "Usage will appear after internal API clients or AD health/sync/login run for this tenant." %}</p>
+    {% endif %}
+  </section>
+
   <section class="d365-form-section">
     <h2 class="d365-form-section__title">{% trans "Related tools" %}</h2>
     <ul class="d365-help">
-      <li><a href="{% url 'hierarchy:api_health_test' %}?tenant={{ tenant.slug }}">{% trans "External API health" %}</a></li>
       <li><a href="{% url 'hierarchy:user_sync' %}">{% trans "Sync users" %}</a> — <code class="d365-code">GET /api/auth/users</code></li>
       <li><a href="{% url 'hierarchy:api_guide' %}">{% trans "Internal API guide" %}</a> — <code class="d365-code">{{ site_api_base }}</code></li>
     </ul>
@@ -162,7 +303,7 @@
   <section class="d365-form-section d365-form-section--last">
     <h2 class="d365-form-section__title">{% trans "Example outbound request" %}</h2>
     <p class="d365-help">{% trans "Header" %}: <code class="d365-code">{{ api_key_header }}</code></p>
-    <pre class="d365-pre">curl -sS "{{ ad_base_url|default:'https://ad-server.example.com' }}/api/health" \
+    <pre class="d365-pre">curl -sS "{{ health_url|default:'https://ad-server.example.com/api/health' }}" \
   -H "{{ api_key_header }}: &lt;your-api-key&gt;"</pre>
   </section>
 </div>

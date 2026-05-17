@@ -58,13 +58,13 @@ class Tenant(models.Model):
         return self.name
 
     def get_api_health_url(self):
-        """GET target for /api/health; falls back to global settings if base URL empty."""
-        base = (self.api_base_url or "").strip().rstrip("/")
-        if base:
-            return f"{base}/api/health"
-        from django.conf import settings
+        """GET target for ``/api/health`` on this tenant's external API base (same as sync)."""
+        from .remote_users import external_health_url, resolve_tenant_api_base
 
-        return getattr(settings, "EXTERNAL_API_HEALTH_URL", "")
+        base = resolve_tenant_api_base(self)
+        if base:
+            return external_health_url(base)
+        return ""
 
 
 class OrgUnitType(models.TextChoices):
@@ -546,6 +546,50 @@ class SignatureImage(models.Model):
 
     def __str__(self):
         return self.label or f"Signature #{self.pk}"
+
+
+class TenantApiUsageDaily(models.Model):
+    """Per-tenant daily counters for inbound (Hierarchy API) and outbound (AD) calls."""
+
+    class Direction(models.TextChoices):
+        INBOUND = "inbound", "Inbound"
+        OUTBOUND = "outbound", "Outbound"
+
+    tenant = models.ForeignKey(
+        Tenant,
+        on_delete=models.CASCADE,
+        related_name="api_usage_daily",
+    )
+    date = models.DateField(db_index=True)
+    direction = models.CharField(max_length=8, choices=Direction.choices, db_index=True)
+    operation = models.CharField(
+        max_length=128,
+        help_text="Inbound: API route name. Outbound: health, ad_sync, ad_login.",
+    )
+    request_count = models.PositiveIntegerField(default=0)
+    error_count = models.PositiveIntegerField(default=0)
+    last_request_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of the most recent call counted on this day.",
+    )
+
+    class Meta:
+        ordering = ["-date", "direction", "operation"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "date", "direction", "operation"],
+                name="uniq_tenant_api_usage_daily",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["tenant", "date"]),
+        ]
+        verbose_name = "tenant API usage (daily)"
+        verbose_name_plural = "tenant API usage (daily)"
+
+    def __str__(self):
+        return f"{self.tenant_id} {self.date} {self.direction} {self.operation}"
 
 
 class AuditLog(models.Model):

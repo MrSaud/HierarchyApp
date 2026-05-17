@@ -1,7 +1,4 @@
 import json
-import time
-import urllib.error
-import urllib.request
 from dataclasses import asdict
 from pathlib import Path
 from urllib.parse import urlencode
@@ -24,6 +21,7 @@ from .access import (
     ensure_tenant_manage,
     resolve_active_structure_tenant,
 )
+from .api_usage import tenant_api_usage_summary
 from .audit_store import record_audit
 from .api_auth import generate_tenant_api_token
 from .forms import (
@@ -44,19 +42,20 @@ from .tenant_api_credentials import (
 )
 from .user_tenant import get_user_tenant, get_user_tenant_id
 from .remote_users import (
-    tenant_external_api_configured,
     RemoteUserSyncError,
     build_users_list_url,
     extract_user_rows,
+    external_health_url,
     fetch_remote_users_json,
+    probe_external_api_health,
     resolve_tenant_api_base,
     sync_users_for_tenant,
     sync_users_for_tenant_events,
+    tenant_external_api_configured,
 )
 from .employee_bulk_import import import_employees_from_csv
 from .models import AuditLog, Delegation, Employee, SignatureImage, Tenant
 from .organization_structure import count_structure_stats
-from .tenant_api_credentials import merge_outbound_api_headers
 from .tenant_scope import (
     SESSION_ACTIVE_TENANT_KEY,
     SESSION_TENANT_SCOPE_ALL,
@@ -370,8 +369,11 @@ def tenant_api_access(request, pk=None):
     has_key = bool(outbound_key)
     api_key_preview = mask_api_key_preview(outbound_key) if has_key else ""
     site_base = request.build_absolute_uri("/").rstrip("/")
-    ad_base = (tenant.api_base_url or "").strip().rstrip("/")
+    ad_base = resolve_tenant_api_base(tenant)
     external_configured = tenant_external_api_configured(tenant)
+    health_probe = probe_external_api_health(tenant) if request.method == "GET" else None
+    health_url = external_health_url(ad_base) if ad_base else ""
+    api_usage = tenant_api_usage_summary(tenant)
 
     return render(
         request,
@@ -384,6 +386,9 @@ def tenant_api_access(request, pk=None):
             "api_key_preview": api_key_preview,
             "api_key_header": header_name,
             "ad_base_url": ad_base,
+            "health_url": health_url,
+            "health_probe": health_probe,
+            "api_usage": api_usage,
             "external_api_configured": external_configured,
             "external_login_enabled": tenant.external_login_enabled,
             "site_api_base": site_base,
@@ -966,7 +971,11 @@ def user_sync(request):
         return render(request, "hierarchy/user_sync.html", context)
 
     try:
-        payload = fetch_remote_users_json(request_url, tenant=sync_tenant)
+        payload = fetch_remote_users_json(
+            request_url,
+            tenant=sync_tenant,
+            usage_operation="ad_sync",
+        )
         rows = extract_user_rows(payload)
         stats = sync_users_for_tenant(sync_tenant, rows, only_new=prep["only_new"])
         context["last_stats"] = stats
@@ -1057,7 +1066,11 @@ def user_sync_stream(request):
     def ndjson_iter():
         yield _sync_ndjson_line({"phase": "fetch", "pct": 0, "label": "Fetching remote users…"})
         try:
-            payload = fetch_remote_users_json(request_url, tenant=sync_tenant)
+            payload = fetch_remote_users_json(
+                request_url,
+                tenant=sync_tenant,
+                usage_operation="ad_sync",
+            )
             rows = extract_user_rows(payload)
         except RemoteUserSyncError as exc:
             yield _sync_ndjson_line({"phase": "error", "message": str(exc)})
@@ -1123,92 +1136,22 @@ def user_sync_stream(request):
 
 @login_required
 def api_health_test(request):
-    """Staff-only page: GET external /api/health for the effective tenant (or global fallback)."""
+    """Redirect legacy API health URL to External API (AD) page for the tenant."""
     if not request.user.is_staff:
         raise PermissionDenied
 
-    timeout = settings.EXTERNAL_API_HEALTH_TIMEOUT
-    tenant = None
     tenant_slug = (request.GET.get("tenant") or "").strip()
-
-    if request.user.is_superuser:
-        if tenant_slug:
-            tenant = Tenant.objects.filter(slug__iexact=tenant_slug).first()
-            if tenant is None:
-                messages.warning(
-                    request,
-                    f'Unknown tenant slug "{tenant_slug}". Using session scope or global fallback.',
-                )
-        if tenant is None:
-            tenant = get_superuser_active_tenant(request)
-    else:
+    tenant = None
+    if tenant_slug:
+        tenant = Tenant.objects.filter(slug__iexact=tenant_slug).first()
+    if tenant is None and request.user.is_superuser:
+        tenant = get_superuser_active_tenant(request)
+    if tenant is None:
         tenant = get_user_tenant(request.user)
-
-    if tenant is not None:
-        url = tenant.get_api_health_url()
-    else:
-        url = settings.EXTERNAL_API_HEALTH_URL
-
-    context = {
-        "health_url": url,
-        "timeout_seconds": timeout,
-        "probe_tenant": tenant,
-    }
-
-    if request.user.is_superuser:
-        context["tenant_choices"] = Tenant.objects.filter(is_active=True).order_by("name")
-
-    t0 = time.monotonic()
-    try:
-        headers = merge_outbound_api_headers(
-            {"Accept": "application/json"},
-            tenant,
-        )
-        req = urllib.request.Request(
-            url,
-            method="GET",
-            headers=headers,
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body_bytes = resp.read()
-            elapsed_ms = int((time.monotonic() - t0) * 1000)
-            body_text = body_bytes.decode("utf-8", errors="replace")
-            context["http_status"] = resp.status
-            context["elapsed_ms"] = elapsed_ms
-            context["success"] = True
-            try:
-                parsed = json.loads(body_text)
-                context["json_body"] = parsed
-                context["json_body_pretty"] = json.dumps(
-                    parsed, indent=2, ensure_ascii=False
-                )
-            except json.JSONDecodeError:
-                context["raw_body"] = body_text
-    except urllib.error.HTTPError as e:
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
-        context["success"] = False
-        context["http_status"] = e.code
-        context["elapsed_ms"] = elapsed_ms
-        context["error"] = e.reason or f"HTTP {e.code}"
-        try:
-            context["raw_body"] = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            pass
-    except urllib.error.URLError as e:
-        context["success"] = False
-        context["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
-        reason = getattr(e, "reason", e)
-        context["error"] = str(reason)
-    except TimeoutError:
-        context["success"] = False
-        context["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
-        context["error"] = "Request timed out."
-    except Exception as e:
-        context["success"] = False
-        context["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
-        context["error"] = str(e)
-
-    return render(request, "hierarchy/api_health_test.html", context)
+    if tenant is None:
+        messages.error(request, "No tenant available for external API health.")
+        return redirect("hierarchy:tenant_list")
+    return redirect("hierarchy:tenant_api_access_for", pk=tenant.pk)
 
 
 @login_required
