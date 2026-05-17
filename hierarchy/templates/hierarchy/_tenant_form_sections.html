@@ -1,0 +1,62 @@
+{% load i18n %}
+{# Expects: form, is_edit (bool), tenant (optional), hierarchy_api_base (optional) #}
+
+<section class="d365-form-section" aria-labelledby="tenant-section-organization">
+  <h2 class="d365-form-section__title" id="tenant-section-organization">{{ api_organization_section }}</h2>
+  <p class="d365-help">{{ api_organization_lead }}</p>
+  {% if is_edit and tenant %}
+  <dl class="tenant-record-meta">
+    <div class="tenant-record-meta__row">
+      <dt>{% trans "Tenant ID" %}</dt>
+      <dd><code class="d365-code">{{ tenant.pk }}</code></dd>
+    </div>
+    <div class="tenant-record-meta__row">
+      <dt>{% trans "Created" %}</dt>
+      <dd>{{ tenant.created_at|date:"Y-m-d H:i" }}</dd>
+    </div>
+  </dl>
+  {% endif %}
+  <div class="d365-field">
+    <label class="d365-label" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+    {{ form.name }}
+    {% if form.name.errors %}<span class="d365-field__error">{{ form.name.errors.0 }}</span>{% endif %}
+  </div>
+  <div class="d365-field">
+    <label class="d365-label" for="{{ form.slug.id_for_label }}">{{ form.slug.label }}</label>
+    {{ form.slug }}
+    {% if form.slug.help_text %}<p class="d365-help">{{ form.slug.help_text }}</p>{% endif %}
+    {% if form.slug.errors %}<span class="d365-field__error">{{ form.slug.errors.0 }}</span>{% endif %}
+  </div>
+</section>
+
+<section class="d365-form-section{% if is_edit %} d365-form-section--last{% endif %}" aria-labelledby="tenant-section-status">
+  <h2 class="d365-form-section__title" id="tenant-section-status">{{ api_status_section }}</h2>
+  <p class="d365-help">{{ api_status_lead }}</p>
+  <div class="d365-field d365-field--checkbox">
+    <label class="d365-checkbox-label">
+      {{ form.is_active }}
+      <span>{{ form.is_active.label }}</span>
+    </label>
+    {% if form.is_active.errors %}<span class="d365-field__error">{{ form.is_active.errors.0 }}</span>{% endif %}
+  </div>
+  {% if is_edit and tenant %}
+  <p class="d365-help" style="margin-top: 1rem;">
+    {% trans "Active Directory connection and ApiKey are configured on" %}
+    <a href="{% url 'hierarchy:tenant_api_access_for' tenant.pk %}">{{ api_external_section }}</a>.
+  </p>
+  {% endif %}
+</section>
+
+{% if not is_edit %}
+<section class="d365-form-section d365-form-section--last" aria-labelledby="tenant-section-next-steps">
+  <h2 class="d365-form-section__title" id="tenant-section-next-steps">{% trans "Next step" %}</h2>
+  <p class="d365-help">
+    {% trans "After creating the tenant, configure the external AD API (base URL and ApiKey) on the External API page." %}
+  </p>
+  <p class="d365-help">
+    {{ api_internal_section }}:
+    <code class="d365-code">{{ hierarchy_api_base }}</code>
+    <span class="d365-help__muted">({% trans "e.g." %} <code class="d365-code">{{ hierarchy_api_base }}/api/employees/</code>)</span>
+  </p>
+</section>
+{% endif %}

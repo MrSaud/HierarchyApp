@@ -1,4 +1,4 @@
-"""Fetch users from tenant remote API GET /api/auth/users and upsert Django users."""
+"""Fetch users from the tenant external API (AD) GET /api/auth/users and upsert Django users."""
 
 from __future__ import annotations
 
@@ -25,11 +25,22 @@ from .models import (
     Sector,
     Tenant,
 )
-from .tenant_api_credentials import merge_outbound_api_headers
+from .tenant_api_credentials import (
+    merge_outbound_api_headers,
+    tenant_outbound_api_key,
+)
 
 
 class RemoteUserSyncError(Exception):
     """HTTP / JSON / configuration error before local DB writes."""
+
+
+class RemoteLoginError(Exception):
+    """External AD rejected credentials (HTTP 401/403 or ``success: false``)."""
+
+
+class RemoteLoginUnavailableError(Exception):
+    """External AD login could not be attempted (missing config or server error)."""
 
 
 def default_api_base_from_settings() -> str:
@@ -47,37 +58,98 @@ def resolve_tenant_api_base(tenant: Tenant) -> str:
     return default_api_base_from_settings()
 
 
-def build_users_list_url(base: str, *, search: str | None, take: int, username: str | None) -> str:
-    base = base.strip().rstrip("/")
-    url = f"{base}/api/auth/users"
+def tenant_external_api_configured(tenant: Tenant) -> bool:
+    """True when sync, health, and other outbound tools may call the external AD API."""
+    return bool(tenant.is_active and resolve_tenant_api_base(tenant))
+
+
+def tenant_external_api_active(tenant: Tenant) -> bool:
+    """Alias for :func:`tenant_external_api_configured` (backward-compatible name)."""
+    return tenant_external_api_configured(tenant)
+
+
+def tenant_external_login_active(tenant: Tenant) -> bool:
+    """True when ``POST /api/auth/login/`` should verify credentials against AD."""
+    return bool(
+        tenant_external_api_configured(tenant) and getattr(tenant, "external_login_enabled", True)
+    )
+
+
+def external_users_url(base: str) -> str:
+    """``{base}/api/auth/users`` (external AD user list / login probe)."""
+    return f"{base.strip().rstrip('/')}/api/auth/users"
+
+
+def external_auth_users_url(base: str) -> str:
+    """Alias for :func:`external_users_url` (backward-compatible name)."""
+    return external_users_url(base)
+
+
+def build_external_login_url(base: str) -> str:
+    """External login probe path without credentials (for display in ``auth`` payloads)."""
+    return external_auth_users_url(base)
+
+
+def sam_account_name_from_login(username: str) -> str:
+    """``Test@swap.local`` → ``Test``; otherwise the login name as-is."""
+    u = username.strip()
+    if "@" in u:
+        return u.split("@", 1)[0]
+    return u
+
+
+def build_external_login_request_body(*, username: str, password: str) -> bytes:
+    """JSON body for external ``GET /api/auth/users`` credential check (Postman)."""
+    return json.dumps({"username": username, "password": password}).encode("utf-8")
+
+
+def build_users_list_url(
+    base: str,
+    *,
+    search: str | None,
+    take: int,
+    container: str | None = None,
+) -> str:
+    """
+    ``GET /api/auth/users?take=…&search=…&container=…``
+
+    ``search`` filters name / UPN / email (substring). ``take`` default 100, max 500.
+    ``container`` is an optional OU DN scope override.
+    """
+    url = external_users_url(base)
     params: list[tuple[str, str]] = []
     take_n = max(1, min(500, int(take)))
     params.append(("take", str(take_n)))
     if search:
         params.append(("search", search.strip()))
-    if username:
-        params.append(("username", username.strip()))
-    q = urllib.parse.urlencode(params)
-    return f"{url}?{q}"
+    if container:
+        params.append(("container", container.strip()))
+    if not params:
+        return url
+    return f"{url}?{urllib.parse.urlencode(params)}"
 
 
 def fetch_remote_users_json(
     url: str,
     *,
     tenant: Tenant | None = None,
+    json_body: bytes | None = None,
     timeout: int | None = None,
 ) -> object:
+    """
+    ``GET`` remote URL with tenant ApiKey / ApiKeyHeader.
+
+  When ``json_body`` is set, sends it as the request body (external login probe).
+    """
     to = timeout if timeout is not None else getattr(
         settings,
         "EXTERNAL_API_HEALTH_TIMEOUT",
         10,
     )
     headers = merge_outbound_api_headers({"Accept": "application/json"}, tenant)
-    req = urllib.request.Request(
-        url,
-        method="GET",
-        headers=headers,
-    )
+    if json_body is not None:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, method="GET", headers=headers, data=json_body)
     try:
         with urllib.request.urlopen(req, timeout=to) as resp:
             body = resp.read().decode("utf-8", errors="replace")
@@ -97,6 +169,46 @@ def fetch_remote_users_json(
         raise RemoteUserSyncError(f"Network error: {e}") from e
     except json.JSONDecodeError as e:
         raise RemoteUserSyncError(f"Invalid JSON from remote API: {e}") from e
+
+
+def verify_external_login(
+    tenant: Tenant,
+    *,
+    username: str,
+    password: str,
+) -> object:
+    """
+    Verify credentials against the tenant external AD API.
+
+    ``GET {base}/api/auth/users`` with JSON body ``username`` / ``password`` and
+    outbound tenant ApiKey (same path as sync; credentials in body for login only).
+    """
+    base = resolve_tenant_api_base(tenant)
+    if not base:
+        raise RemoteLoginUnavailableError("No external API base URL configured.")
+    if not tenant_outbound_api_key(tenant):
+        raise RemoteLoginUnavailableError(
+            "Tenant ApiKey is not configured for external API calls."
+        )
+
+    url = external_users_url(base)
+    body = build_external_login_request_body(username=username, password=password)
+    try:
+        payload = fetch_remote_users_json(url, tenant=tenant, json_body=body)
+    except RemoteUserSyncError as exc:
+        msg = str(exc)
+        if "HTTP 401" in msg or "HTTP 403" in msg:
+            raise RemoteLoginError(msg) from exc
+        raise RemoteLoginUnavailableError(msg) from exc
+
+    if isinstance(payload, dict):
+        if payload.get("success") is False:
+            detail = payload.get("message") or payload.get("detail") or "External authentication failed."
+            raise RemoteLoginError(str(detail))
+        if payload.get("authenticated") is False:
+            detail = payload.get("message") or "External authentication failed."
+            raise RemoteLoginError(str(detail))
+    return payload
 
 
 def extract_user_rows(payload: object) -> list[dict]:
@@ -599,6 +711,7 @@ class SyncStats:
     created: int = 0
     updated: int = 0
     skipped: int = 0
+    skipped_existing: int = 0
     tenant_linked: int = 0
     employees_created: int = 0
     employees_updated: int = 0
@@ -606,104 +719,229 @@ class SyncStats:
     errors: list[str] = field(default_factory=list)
 
 
+@dataclass
+class RemoteUserUpsertResult:
+    user: object | None = None
+    employee: Employee | None = None
+    user_created: bool = False
+    user_updated: bool = False
+    employee_created: bool = False
+    employee_updated: bool = False
+    skipped_no_username: bool = False
+    skipped_existing: bool = False
+    errors: list[str] = field(default_factory=list)
+
+
+def pick_remote_user_row_for_login(rows: list[dict], username: str) -> dict | None:
+    """Choose the AD row that matches the login id when the payload has multiple users."""
+    if not rows:
+        return None
+    if len(rows) == 1:
+        return rows[0]
+
+    login = username.strip()
+    sam = sam_account_name_from_login(login)
+    keys: list[str] = []
+    for value in (login, sam):
+        key = value.lower()
+        if key not in {k.lower() for k in keys}:
+            keys.append(value)
+
+    for row in rows:
+        uname = (extract_username(row) or "").strip()
+        ud = extract_user_defaults(row)
+        email = (ud.get("email") or "").strip()
+        for key in keys:
+            if uname and uname.lower() == key.lower():
+                return row
+            if email and email.lower() == key.lower():
+                return row
+            if "@" in key and email and email.lower() == login.lower():
+                return row
+    return rows[0]
+
+
+def upsert_user_from_remote_row(
+    tenant: Tenant,
+    raw: dict,
+    *,
+    only_new: bool = False,
+) -> RemoteUserUpsertResult:
+    """Create or update one Django ``User`` and ``Employee`` from a remote AD user dict."""
+    User = get_user_model()
+    result = RemoteUserUpsertResult()
+    uname = extract_username(raw)
+    if not uname:
+        result.skipped_no_username = True
+        return result
+
+    if only_new and User.objects.filter(username__iexact=uname).exists():
+        result.skipped_existing = True
+        return result
+
+    try:
+        ud = extract_user_defaults(raw)
+        emp_updates = extract_employee_updates(raw)
+
+        user = User.objects.filter(username__iexact=uname).first()
+        if user is None:
+            user = User(
+                username=uname,
+                email=ud["email"],
+                first_name=ud["first_name"],
+                last_name=ud["last_name"],
+            )
+            user.set_unusable_password()
+            user.save()
+            result.user_created = True
+        else:
+            changed = False
+            if ud["email"] and user.email != ud["email"]:
+                user.email = ud["email"]
+                changed = True
+            if user.first_name != ud["first_name"]:
+                user.first_name = ud["first_name"]
+                changed = True
+            if user.last_name != ud["last_name"]:
+                user.last_name = ud["last_name"]
+                changed = True
+            if changed:
+                user.save(update_fields=["email", "first_name", "last_name"])
+                result.user_updated = True
+
+        emp, emp_created = Employee.objects.get_or_create(
+            user=user,
+            defaults={
+                "sector": emp_updates.get("sector", Sector.GOVERNMENT),
+                "tenant": tenant,
+            },
+        )
+        result.employee = emp
+        if emp_created:
+            result.employee_created = True
+
+        changed_fields: list[str] = []
+        if emp.tenant_id != tenant.pk:
+            emp.tenant = tenant
+            changed_fields.append("tenant")
+
+        for fname, val in emp_updates.items():
+            current = getattr(emp, fname)
+            if current != val:
+                setattr(emp, fname, val)
+                changed_fields.append(fname)
+
+        photo_added = False
+        photo_url = extract_photo_url(raw)
+        if photo_url and not emp.personal_photo:
+            cf = try_download_photo(photo_url)
+            if cf:
+                emp.personal_photo.save(cf.name, cf, save=False)
+                photo_added = True
+
+        if changed_fields or photo_added:
+            update_fields = changed_fields.copy()
+            if photo_added:
+                update_fields.append("personal_photo")
+            try:
+                emp.save(update_fields=update_fields)
+            except Exception as exc:
+                result.errors.append(f"{uname} (employee save): {exc}")
+            else:
+                if not emp_created:
+                    result.employee_updated = True
+
+        result.user = user
+    except Exception as exc:
+        result.errors.append(f"{uname}: {exc}")
+
+    return result
+
+
+def link_employee_manager_for_tenant(
+    tenant: Tenant,
+    *,
+    user_username_lower: str,
+    manager_username: str,
+) -> bool:
+    """Set ``employee.manager`` when both employees exist in the tenant."""
+    mgr_uname = manager_username.strip()
+    if not mgr_uname:
+        return False
+    emp = Employee.objects.filter(
+        user__username__iexact=user_username_lower,
+        tenant=tenant,
+    ).first()
+    mgr_emp = Employee.objects.filter(
+        user__username__iexact=mgr_uname,
+        tenant=tenant,
+    ).first()
+    if emp and mgr_emp and emp.pk != mgr_emp.pk:
+        if emp.manager_id != mgr_emp.pk:
+            emp.manager = mgr_emp
+            emp.save(update_fields=["manager"])
+            return True
+    return False
+
+
+def link_manager_from_remote_row(tenant: Tenant, raw: dict) -> list[str]:
+    uname = extract_username(raw)
+    mgr_u = extract_manager_username(raw)
+    if not uname or not mgr_u:
+        return []
+    try:
+        link_employee_manager_for_tenant(
+            tenant,
+            user_username_lower=uname.lower(),
+            manager_username=mgr_u,
+        )
+    except Exception as exc:
+        return [f"manager {mgr_u}: {exc}"]
+    return []
+
+
 def sync_users_for_tenant_events(
-    tenant: Tenant, rows: list[dict]
+    tenant: Tenant,
+    rows: list[dict],
+    *,
+    only_new: bool = False,
 ) -> Iterator[dict[str, Any]]:
     """
     Create/update Django ``User`` and ``Employee`` from API rows.
 
+    When ``only_new`` is true, skip rows whose username already exists locally
+    (no user or employee updates for existing accounts).
+
     Yields ``phase: row`` after each remote row (percentage ~5–90%), then
     ``phase: managers``, then ``phase: complete`` with ``SyncStats``.
     """
-    User = get_user_model()
     stats = SyncStats()
     pending_managers: list[tuple[str, str]] = []
     total = len(rows)
 
     for i, raw in enumerate(rows):
+        upsert = upsert_user_from_remote_row(tenant, raw, only_new=only_new)
         uname = extract_username(raw)
-        if not uname:
+        if upsert.skipped_no_username:
             stats.skipped += 1
+        elif upsert.skipped_existing:
+            stats.skipped_existing += 1
         else:
-            try:
-                ud = extract_user_defaults(raw)
-                emp_updates = extract_employee_updates(raw)
+            if uname:
                 mgr_u = extract_manager_username(raw)
                 if mgr_u:
                     pending_managers.append((uname.lower(), mgr_u.strip()))
-
-                user = User.objects.filter(username__iexact=uname).first()
-                if user is None:
-                    user = User(
-                        username=uname,
-                        email=ud["email"],
-                        first_name=ud["first_name"],
-                        last_name=ud["last_name"],
-                    )
-                    user.set_unusable_password()
-                    user.save()
-                    stats.created += 1
-                else:
-                    changed = False
-                    if ud["email"] and user.email != ud["email"]:
-                        user.email = ud["email"]
-                        changed = True
-                    if user.first_name != ud["first_name"]:
-                        user.first_name = ud["first_name"]
-                        changed = True
-                    if user.last_name != ud["last_name"]:
-                        user.last_name = ud["last_name"]
-                        changed = True
-                    if changed:
-                        user.save(update_fields=["email", "first_name", "last_name"])
-                        stats.updated += 1
-
+            if upsert.user_created:
+                stats.created += 1
+            elif upsert.user_updated:
+                stats.updated += 1
+            if upsert.user is not None:
                 stats.tenant_linked += 1
-
-                emp, emp_created = Employee.objects.get_or_create(
-                    user=user,
-                    defaults={
-                        "sector": emp_updates.get("sector", Sector.GOVERNMENT),
-                        "tenant": tenant,
-                    },
-                )
-                if emp_created:
-                    stats.employees_created += 1
-
-                changed_fields: list[str] = []
-                if emp.tenant_id != tenant.pk:
-                    emp.tenant = tenant
-                    changed_fields.append("tenant")
-
-                for fname, val in emp_updates.items():
-                    current = getattr(emp, fname)
-                    if current != val:
-                        setattr(emp, fname, val)
-                        changed_fields.append(fname)
-
-                photo_added = False
-                photo_url = extract_photo_url(raw)
-                if photo_url and not emp.personal_photo:
-                    cf = try_download_photo(photo_url)
-                    if cf:
-                        emp.personal_photo.save(cf.name, cf, save=False)
-                        photo_added = True
-
-                if changed_fields or photo_added:
-                    update_fields = changed_fields.copy()
-                    if photo_added:
-                        update_fields.append("personal_photo")
-
-                    try:
-                        emp.save(update_fields=update_fields)
-                    except Exception as exc:
-                        stats.errors.append(f"{uname} (employee save): {exc}")
-                    else:
-                        if not emp_created and (changed_fields or photo_added):
-                            stats.employees_updated += 1
-
-            except Exception as exc:
-                stats.errors.append(f"{uname}: {exc}")
+            if upsert.employee_created:
+                stats.employees_created += 1
+            elif upsert.employee_updated:
+                stats.employees_updated += 1
+            stats.errors.extend(upsert.errors)
 
         pct = 5 + int((i + 1) / max(total, 1) * 90)
         yield {"phase": "row", "done": i + 1, "total": total, "pct": pct}
@@ -716,19 +954,12 @@ def sync_users_for_tenant_events(
             continue
         seen_pairs.add((user_lower, mgr_uname.lower()))
         try:
-            emp = Employee.objects.filter(
-                user__username__iexact=user_lower,
-                tenant=tenant,
-            ).first()
-            mgr_emp = Employee.objects.filter(
-                user__username__iexact=mgr_uname,
-                tenant=tenant,
-            ).first()
-            if emp and mgr_emp and emp.pk != mgr_emp.pk:
-                if emp.manager_id != mgr_emp.pk:
-                    emp.manager = mgr_emp
-                    emp.save(update_fields=["manager"])
-                    stats.managers_linked += 1
+            if link_employee_manager_for_tenant(
+                tenant,
+                user_username_lower=user_lower,
+                manager_username=mgr_uname,
+            ):
+                stats.managers_linked += 1
         except Exception as exc:
             stats.errors.append(f"manager {mgr_uname}: {exc}")
 
@@ -741,9 +972,14 @@ def sync_users_for_tenant_events(
     }
 
 
-def sync_users_for_tenant(tenant: Tenant, rows: list[dict]) -> SyncStats:
+def sync_users_for_tenant(
+    tenant: Tenant,
+    rows: list[dict],
+    *,
+    only_new: bool = False,
+) -> SyncStats:
     """Create/update Django ``User`` and ``Employee`` from API rows (employee carries tenant)."""
-    for ev in sync_users_for_tenant_events(tenant, rows):
+    for ev in sync_users_for_tenant_events(tenant, rows, only_new=only_new):
         if ev["phase"] == "complete":
             return ev["stats"]
     raise RuntimeError("sync incomplete")

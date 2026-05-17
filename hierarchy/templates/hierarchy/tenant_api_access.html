@@ -1,19 +1,21 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}API access — {{ tenant.name }}{% endblock %}
+{% block title %}{{ api_external_section }} — {{ tenant.name }}{% endblock %}
 
 {% block content %}
 <div class="d365-card d365-card--wide">
   <div class="d365-card__header-row">
     <div>
-      <h1>{% trans "API access" %}</h1>
+      <h1>{{ api_external_section }}</h1>
       <p class="d365-card__subtitle">
         {{ tenant.name }} · <code class="d365-code">{{ tenant.slug }}</code>
-        · tenant id <code class="d365-code">{{ tenant.pk }}</code>
+        · {% trans "tenant id" %} <code class="d365-code">{{ tenant.pk }}</code>
       </p>
     </div>
     <div class="d365-card__actions">
+      <a href="{% url 'hierarchy:api_health_test' %}?tenant={{ tenant.slug }}" class="d365-btn">{% trans "API health" %}</a>
+      <a href="{% url 'hierarchy:user_sync' %}" class="d365-btn">{% trans "Sync users" %}</a>
       <a href="{% url 'hierarchy:api_guide' %}" class="d365-btn">{% trans "API guide" %}</a>
       {% if can_manage_tenant_record %}
         <a href="{% url 'hierarchy:tenant_edit' tenant.pk %}" class="d365-btn">{% trans "Edit tenant" %}</a>
@@ -21,76 +23,147 @@
     </div>
   </div>
 
-  <p class="d365-help">
-    Generate a secret for integrations calling this app's APIs
-    (<code class="d365-code">GET /api/employees/</code>,
-    <code class="d365-code">GET /api/organization/units/</code>,
-    <code class="d365-code">POST /api/auth/users/</code>).
-    Send it on every request using the header below. Staff on this tenant can manage the token here.
-  </p>
+  <p class="d365-help">{{ api_external_lead }}</p>
+
+  <dl class="tenant-record-meta" style="margin-bottom: 1.25rem;">
+    <div class="tenant-record-meta__row">
+      <dt>{% trans "External API" %}</dt>
+      <dd>
+        {% if external_api_configured %}
+          <strong>{% trans "Configured" %}</strong> — {% trans "sync, health, and outbound tools use AD" %}
+        {% else %}
+          <strong>{% trans "Not configured" %}</strong> — {% trans "set base URL below" %}
+        {% endif %}
+      </dd>
+    </div>
+    <div class="tenant-record-meta__row">
+      <dt>{% trans "API login" %}</dt>
+      <dd>
+        {% if external_login_enabled and external_api_configured %}
+          <strong>{% trans "ON" %}</strong> — {% trans "credentials verified with AD" %}
+        {% elif external_api_configured %}
+          <strong>{% trans "OFF" %}</strong> — {% trans "local Django passwords only" %}
+        {% else %}
+          <span class="d365-help__muted">{% trans "N/A until external API is configured" %}</span>
+        {% endif %}
+      </dd>
+    </div>
+  </dl>
 
   {% if new_token %}
   <div class="d365-alert d365-alert--warning" role="alert">
-    <p><strong>Copy this token now.</strong> It will not be shown again after you leave this page.</p>
+    <p><strong>{% trans "Copy this ApiKey now." %}</strong> {% trans "It will not be shown again after you leave this page." %}</p>
     <pre class="d365-pre" id="tenant-api-token">{{ new_token }}</pre>
     <button type="button" class="d365-btn" id="copy-tenant-api-token">{% trans "Copy token" %}</button>
   </div>
   {% endif %}
 
-  <section class="d365-form-section">
-    <h2 class="d365-form-section__title">{% trans "Token status" %}</h2>
-    {% if has_api_key %}
-      <p class="d365-help">
-        A token is <strong>configured</strong> for this tenant
-        (stored on the server; the value is never displayed except right after generation).
-      </p>
-    {% else %}
-      <p class="d365-help">No token is configured. Generate one before external systems can call the API.</p>
-    {% endif %}
+  <form method="post" action="" class="d365-form d365-form--stacked d365-form--sectioned" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save">
 
+    <section class="d365-form-section" aria-labelledby="ext-section-connection">
+      <h2 class="d365-form-section__title" id="ext-section-connection">{% trans "Connection" %}</h2>
+      <div class="d365-field">
+        <label class="d365-label" for="{{ external_form.api_base_url.id_for_label }}">{{ external_form.api_base_url.label }}</label>
+        {{ external_form.api_base_url }}
+        {% if external_form.api_base_url.help_text %}<p class="d365-help">{{ external_form.api_base_url.help_text }}</p>{% endif %}
+        {% if external_form.api_base_url.errors %}<span class="d365-field__error">{{ external_form.api_base_url.errors.0 }}</span>{% endif %}
+      </div>
+    </section>
+
+    <section class="d365-form-section" aria-labelledby="ext-section-login">
+      <h2 class="d365-form-section__title" id="ext-section-login">{{ api_external_login_section }}</h2>
+      <p class="d365-help">{{ api_external_login_lead }}</p>
+      <div class="d365-field d365-field--checkbox">
+        <label class="d365-checkbox-label">
+          {{ external_form.external_login_enabled }}
+          <span>{{ external_form.external_login_enabled.label }}</span>
+        </label>
+        {% if external_form.external_login_enabled.help_text %}
+          <p class="d365-help">{{ external_form.external_login_enabled.help_text }}</p>
+        {% endif %}
+        {% if external_form.external_login_enabled.errors %}
+          <span class="d365-field__error">{{ external_form.external_login_enabled.errors.0 }}</span>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="d365-form-section" aria-labelledby="ext-section-credentials">
+      <h2 class="d365-form-section__title" id="ext-section-credentials">{{ api_external_credentials_section }}</h2>
+      {% if has_api_key %}
+      <p class="d365-help">
+        <strong>{% trans "ApiKey is configured" %}</strong>
+        <code class="d365-code" title="{% trans 'Masked preview' %}">{{ api_key_preview }}</code>
+        <span class="d365-help__muted">({% trans "paste below to replace, or regenerate / revoke" %})</span>
+      </p>
+      {% else %}
+      <p class="d365-help">{% trans "No ApiKey is configured. Generate one or paste a key from the AD server before health checks, sync, and AD login can work." %}</p>
+      {% endif %}
+
+      <div class="d365-field">
+        <label class="d365-label" for="{{ external_form.api_key_header.id_for_label }}">{{ external_form.api_key_header.label }}</label>
+        {{ external_form.api_key_header }}
+        {% if external_form.api_key_header.help_text %}<p class="d365-help">{{ external_form.api_key_header.help_text }}</p>{% endif %}
+        {% if external_form.api_key_header.errors %}<span class="d365-field__error">{{ external_form.api_key_header.errors.0 }}</span>{% endif %}
+      </div>
+
+      <div class="d365-field">
+        <label class="d365-label" for="{{ external_form.api_key.id_for_label }}">{{ external_form.api_key.label }}</label>
+        {{ external_form.api_key }}
+        {% if external_form.api_key.help_text %}<p class="d365-help">{{ external_form.api_key.help_text }}</p>{% endif %}
+        {% if external_form.api_key.errors %}<span class="d365-field__error">{{ external_form.api_key.errors.0 }}</span>{% endif %}
+      </div>
+
+      <div class="d365-field d365-field--checkbox">
+        <label class="d365-checkbox-label">
+          {{ external_form.clear_api_key }}
+          <span>{{ external_form.clear_api_key.label }}</span>
+        </label>
+        {% if external_form.clear_api_key.help_text %}<p class="d365-help">{{ external_form.clear_api_key.help_text }}</p>{% endif %}
+      </div>
+
+      <div class="d365-form__actions">
+        <button type="submit" class="d365-btn d365-btn--primary">{% trans "Save external API settings" %}</button>
+      </div>
+    </section>
+  </form>
+
+  <section class="d365-form-section">
+    <h2 class="d365-form-section__title">{% trans "Generate ApiKey" %}</h2>
+    <p class="d365-help">{% trans "Creates a random key and saves it on this tenant (shown once after generation)." %}</p>
     <div class="d365-form__actions">
       <form method="post" action="">
         {% csrf_token %}
         <input type="hidden" name="action" value="generate">
-        <button type="submit" class="d365-btn d365-btn--primary">
-          {% if has_api_key %}Regenerate token{% else %}Generate token{% endif %}
+        <button type="submit" class="d365-btn">
+          {% if has_api_key %}{% trans "Regenerate ApiKey" %}{% else %}{% trans "Generate ApiKey" %}{% endif %}
         </button>
       </form>
       {% if has_api_key %}
-      <form method="post" action="" onsubmit="return confirm('Revoke the API token? Integrations will stop working until you generate a new one.');">
+      <form method="post" action="" onsubmit="return confirm('{% trans "Revoke the ApiKey? Health, sync, and AD login will fail until a new key is set." %}');">
         {% csrf_token %}
         <input type="hidden" name="action" value="revoke">
-        <button type="submit" class="d365-btn">{% trans "Revoke token" %}</button>
+        <button type="submit" class="d365-btn">{% trans "Revoke ApiKey" %}</button>
       </form>
       {% endif %}
     </div>
   </section>
 
   <section class="d365-form-section">
-    <h2 class="d365-form-section__title">{% trans "How to call the API" %}</h2>
-    <p class="d365-help">Header name: <code class="d365-code">{{ api_key_header }}</code></p>
-    <pre class="d365-pre">curl -sS "{{ site_api_base }}/api/employees/?tenant_id={{ tenant.pk }}&amp;username=jdoe" \
-  -H "{{ api_key_header }}: &lt;your-token&gt;"</pre>
-    <pre class="d365-pre">curl -sS "{{ site_api_base }}/api/organization/units/?tenant_id={{ tenant.pk }}&amp;format=flat" \
-  -H "{{ api_key_header }}: &lt;your-token&gt;"</pre>
-    <pre class="d365-pre">curl -sS -X POST "{{ site_api_base }}/api/auth/users/" \
-  -H "Content-Type: application/json" \
-  -H "{{ api_key_header }}: &lt;your-token&gt;" \
-  -d '{"samAccountName":"jdoe","password":"SecurePass1!","givenName":"Jane","surname":"Doe","tenant":"{{ tenant.slug }}"}'</pre>
+    <h2 class="d365-form-section__title">{% trans "Related tools" %}</h2>
+    <ul class="d365-help">
+      <li><a href="{% url 'hierarchy:api_health_test' %}?tenant={{ tenant.slug }}">{% trans "External API health" %}</a></li>
+      <li><a href="{% url 'hierarchy:user_sync' %}">{% trans "Sync users" %}</a> — <code class="d365-code">GET /api/auth/users</code></li>
+      <li><a href="{% url 'hierarchy:api_guide' %}">{% trans "Internal API guide" %}</a> — <code class="d365-code">{{ site_api_base }}</code></li>
+    </ul>
   </section>
 
-  <section class="d365-form-section">
-    <h2 class="d365-form-section__title">{% trans "Custom header name" %}</h2>
-    <form method="post" class="d365-form">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="header">
-      <div class="d365-field">
-        <label class="d365-label" for="{{ header_form.api_key_header.id_for_label }}">{{ header_form.api_key_header.label }}</label>
-        {{ header_form.api_key_header }}
-        {% if header_form.api_key_header.help_text %}<p class="d365-help">{{ header_form.api_key_header.help_text }}</p>{% endif %}
-      </div>
-      <button type="submit" class="d365-btn">{% trans "Save header name" %}</button>
-    </form>
+  <section class="d365-form-section d365-form-section--last">
+    <h2 class="d365-form-section__title">{% trans "Example outbound request" %}</h2>
+    <p class="d365-help">{% trans "Header" %}: <code class="d365-code">{{ api_key_header }}</code></p>
+    <pre class="d365-pre">curl -sS "{{ ad_base_url|default:'https://ad-server.example.com' }}/api/health" \
+  -H "{{ api_key_header }}: &lt;your-api-key&gt;"</pre>
   </section>
 </div>
 {% endblock %}
@@ -104,7 +177,7 @@
   if (!btn || !pre) return;
   btn.addEventListener("click", function () {
     navigator.clipboard.writeText(pre.textContent.trim()).then(function () {
-      btn.textContent = "Copied";
+      btn.textContent = "{% trans 'Copied' %}";
     });
   });
 })();

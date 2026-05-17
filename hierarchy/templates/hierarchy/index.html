@@ -106,7 +106,7 @@
       <h2 class="d365-hub-panel__title">{% trans "Integrations &amp; data" %}</h2>
       <ul class="d365-hub-panel__list">
         <li><a href="{% url 'hierarchy:api_guide' %}">{% trans "API guide" %}</a></li>
-        <li><a href="{% url 'hierarchy:tenant_api_access' %}">{% trans "API access" %}</a></li>
+        <li><a href="{% url 'hierarchy:tenant_api_access' %}">{{ api_external_section }}</a></li>
         <li><a href="{% url 'hierarchy:user_sync' %}">{% trans "Sync users" %}</a></li>
         <li><a href="{% url 'hierarchy:api_health_test' %}">{% trans "API health" %}</a></li>
       </ul>

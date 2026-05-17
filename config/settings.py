@@ -72,6 +72,7 @@ TEMPLATES = [
                 'hierarchy.context_processors.employee_photo_bar',
                 'hierarchy.context_processors.directory_search_bar',
                 'hierarchy.context_processors.staff_employee_profile_notice',
+                'hierarchy.context_processors.tenant_api_types',
             ],
         },
     },
@@ -174,7 +175,7 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
-# External API health probe fallback when a tenant has no api_base_url configured.
+# External API (AD) health probe fallback when a tenant has no api_base_url configured.
 EXTERNAL_API_HEALTH_URL = os.environ.get(
     'EXTERNAL_API_HEALTH_URL',
     'http://63.183.213.237:1113/api/health',

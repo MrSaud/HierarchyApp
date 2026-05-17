@@ -8,7 +8,7 @@
   <h1>{% trans "Edit tenant" %}</h1>
   <p class="d365-card__subtitle">
     {{ tenant.name }} · <code class="d365-code">{{ tenant.slug }}</code>
-    · <a href="{% url 'hierarchy:tenant_api_access_for' tenant.pk %}">{% trans "API access" %}</a>
+    · <a href="{% url 'hierarchy:tenant_api_access_for' tenant.pk %}">{{ api_external_section }}</a>
   </p>
 
   {% if form.non_field_errors %}
@@ -19,32 +19,9 @@
     </div>
   {% endif %}
 
-  <form method="post" action="{% url 'hierarchy:tenant_edit' tenant.pk %}" class="d365-form d365-form--stacked" novalidate>
+  <form method="post" action="{% url 'hierarchy:tenant_edit' tenant.pk %}" class="d365-form d365-form--stacked d365-form--sectioned" novalidate>
     {% csrf_token %}
-    <div class="d365-field">
-      <label class="d365-label" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
-      {{ form.name }}
-      {% if form.name.errors %}<span class="d365-field__error">{{ form.name.errors.0 }}</span>{% endif %}
-    </div>
-    <div class="d365-field">
-      <label class="d365-label" for="{{ form.slug.id_for_label }}">{{ form.slug.label }}</label>
-      {{ form.slug }}
-      {% if form.slug.help_text %}<p class="d365-help">{{ form.slug.help_text }}</p>{% endif %}
-      {% if form.slug.errors %}<span class="d365-field__error">{{ form.slug.errors.0 }}</span>{% endif %}
-    </div>
-    <div class="d365-field">
-      <label class="d365-label" for="{{ form.api_base_url.id_for_label }}">{{ form.api_base_url.label }}</label>
-      {{ form.api_base_url }}
-      {% if form.api_base_url.help_text %}<p class="d365-help">{{ form.api_base_url.help_text }}</p>{% endif %}
-      {% if form.api_base_url.errors %}<span class="d365-field__error">{{ form.api_base_url.errors.0 }}</span>{% endif %}
-    </div>
-    <div class="d365-field d365-field--checkbox">
-      <label class="d365-checkbox-label">
-        {{ form.is_active }}
-        <span>{{ form.is_active.label }}</span>
-      </label>
-      {% if form.is_active.errors %}<span class="d365-field__error">{{ form.is_active.errors.0 }}</span>{% endif %}
-    </div>
+    {% include "hierarchy/_tenant_form_sections.html" with is_edit=True tenant=tenant %}
     <div class="d365-form__actions">
       <button type="submit" class="d365-btn d365-btn--primary">{% trans "Save tenant" %}</button>
       <a href="{% url 'hierarchy:tenant_list' %}" class="d365-link d365-link--standalone">{% trans "Back to tenants" %}</a>

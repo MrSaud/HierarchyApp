@@ -8,7 +8,7 @@
   <div class="d365-card__header-row">
     <div>
       <h1>{% trans "Tenants" %}</h1>
-      <p class="d365-card__subtitle">Organizations and API bases. Super administrators only.</p>
+      <p class="d365-card__subtitle">{% trans "Organizations with external (AD) and internal (Hierarchy) API settings. Super administrators only." %}</p>
     </div>
     <a href="{% url 'hierarchy:tenant_create' %}" class="d365-btn d365-btn--primary">{% trans "Create tenant" %}</a>
   </div>
@@ -22,7 +22,7 @@
           <tr>
             <th scope="col">Name</th>
             <th scope="col">Slug</th>
-            <th scope="col">API base</th>
+            <th scope="col">{% trans "External API" %}</th>
             <th scope="col">Active</th>
             <th scope="col"><span class="d365-visually-hidden">Actions</span></th>
           </tr>
@@ -35,7 +35,7 @@
               <td>{% if t.api_base_url %}<code class="d365-code">{{ t.api_base_url }}</code>{% else %}—{% endif %}</td>
               <td>{% if t.is_active %}Yes{% else %}No{% endif %}</td>
               <td class="d365-table__actions">
-                <a href="{% url 'hierarchy:tenant_api_access_for' t.pk %}" class="d365-link">{% trans "API" %}</a>
+                <a href="{% url 'hierarchy:tenant_api_access_for' t.pk %}" class="d365-link">{% trans "External API" %}</a>
                 <a href="{% url 'hierarchy:tenant_edit' t.pk %}" class="d365-link">{% trans "Edit" %}</a>
               </td>
             </tr>

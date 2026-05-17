@@ -20,6 +20,7 @@ from .organization_api import (
     _resolve_tenant,
 )
 from .reports_to_api import reports_to_payload_dict
+from .signatures_api import signatures_get_payload_dict
 
 
 def _guide_url(request) -> str:
@@ -118,6 +119,36 @@ def api_v1_assignments_list(request):
         r,
         etag=etag,
         read_contract="assignments-v1",
+        guide_url=_guide_url(request),
+    )
+    r["Access-Control-Allow-Headers"] = v1_cors_allow_headers()
+    return r
+
+
+@require_http_methods(["GET", "OPTIONS"])
+def api_v1_employee_signatures_get(request):
+    if request.method == "OPTIONS":
+        return _v1_read_options()
+
+    data, err = signatures_get_payload_dict(request)
+    if err is not None:
+        return err
+    etag = weak_etag_for_payload(data)
+    if should_return_not_modified(request, etag):
+        r = not_modified_response(etag)
+        attach_v1_read_headers(
+            r,
+            etag=etag,
+            read_contract="employee-signatures-v1",
+            guide_url=_guide_url(request),
+        )
+        r["Access-Control-Allow-Headers"] = v1_cors_allow_headers()
+        return r
+    r = JsonResponse(data, status=200)
+    attach_v1_read_headers(
+        r,
+        etag=etag,
+        read_contract="employee-signatures-v1",
         guide_url=_guide_url(request),
     )
     r["Access-Control-Allow-Headers"] = v1_cors_allow_headers()

@@ -11,6 +11,7 @@ from . import (
     organization_api,
     organization_views,
     reports_to_api,
+    signatures_api,
     views,
 )
 
@@ -35,8 +36,18 @@ urlpatterns = [
     path("api/v1/organization/assignments/", api_v1.api_v1_assignments_list, name="api_v1_assignments_list"),
     path("api/v1/organization/units/", api_v1.api_v1_org_units_list, name="api_v1_org_units_list"),
     path("api/v1/employees/reports-to/", api_v1.api_v1_employee_reports_to_get, name="api_v1_employee_reports_to"),
+    path(
+        "api/v1/employees/signatures/",
+        api_v1.api_v1_employee_signatures_get,
+        name="api_v1_employee_signatures",
+    ),
     path("api/v1/employees/", api_v1.api_v1_employee_get, name="api_v1_employee_get"),
     path("api/employees/reports-to/", reports_to_api.api_reports_to_get, name="api_reports_to"),
+    path(
+        "api/employees/signatures/",
+        signatures_api.api_employee_signatures_get,
+        name="api_employee_signatures",
+    ),
     path("api/employees/", employee_api.api_employee_get, name="api_employee_get"),
     path("api/organization/units/", organization_api.api_org_units_list, name="api_org_units_list"),
     path("tools/api-health/", views.api_health_test, name="api_health_test"),

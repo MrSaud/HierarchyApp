@@ -37,6 +37,7 @@
     html += `<li>Users created: ${st.created}</li>`;
     html += `<li>Users updated: ${st.updated}</li>`;
     html += `<li>Rows skipped (no recognizable username): ${st.skipped}</li>`;
+    html += `<li>Skipped (already in app): ${st.skipped_existing || 0}</li>`;
     html += `<li>Employees linked to tenant (sync): ${st.tenant_linked}</li>`;
     html += `<li>Employee profiles created (were missing): ${st.employees_created}</li>`;
     html += `<li>Employee profiles updated from remote data: ${st.employees_updated}</li>`;

@@ -7,24 +7,22 @@
 <div class="d365-card d365-card--wide">
   <h1>{% trans "API guide" %}</h1>
   <p class="d365-card__subtitle">
-    JSON endpoints <strong>implemented by this Hierarchy app</strong> (routes in
-    <code class="d365-code">hierarchy/urls.py</code> under <code class="d365-code">/api/</code>).
+    <strong>{{ api_internal_section }}</strong> — endpoints this app exposes to other systems.
     Base URL: <code class="d365-code">{{ site_api_base }}</code>
   </p>
   <p class="d365-help api-guide-intro">
+    <strong>{{ api_external_section }}</strong> is separate: Hierarchy connects to each tenant’s AD server
+    for <a href="{% url 'hierarchy:api_health_test' %}">{% trans "health" %}</a> and
+    <a href="{% url 'hierarchy:user_sync' %}">{% trans "user sync" %}</a>
+    (configure on <strong>{{ api_external_section }}</strong> in Administration).
+    This guide covers the <strong>internal API</strong> only.
     Integrations should call <strong>versioned</strong>
     <code class="d365-code">/api/v1/…</code> reads for stable JSON, weak
     <code class="d365-code">ETag</code> / <code class="d365-code">If-None-Match</code> (304),
     and bulk <code class="d365-code">PATCH</code> with <code class="d365-code">If-Match</code> (412 when stale).
     Legacy <code class="d365-code">/api/organization/units/</code> and
     <code class="d365-code">/api/employees/</code> remain available unchanged.
-    Machine clients need a per-tenant API key (see <strong>Administration → API access</strong>).
-    This page does <strong>not</strong> document external tenant backends
-    (<code class="d365-code">GET /api/auth/users</code> for user sync,
-    <code class="d365-code">GET /api/health</code> on a tenant’s
-    <code class="d365-code">api_base_url</code>). Use
-    <a href="{% url 'hierarchy:user_sync' %}">{% trans "Sync users" %}</a> and
-    <a href="{% url 'hierarchy:api_health_test' %}">{% trans "API health" %}</a> for those.
+    Machine clients may use staff session or global Bearer (see <strong>Authentication</strong> below). External AD URL and ApiKey are on <strong>{{ api_external_section }}</strong>.
     Organization assignment board JSON under <code class="d365-code">/organization/</code>
     is staff UI only and is not listed here.
   </p>
@@ -70,7 +68,7 @@
       <li>
         <strong>Tenant API key</strong> — header
         <code class="d365-code">X-Api-Key</code> by default (configurable per tenant on
-        <a href="{% url 'hierarchy:tenant_api_access' %}">{% trans "API access" %}</a>).
+        <a href="{% url 'hierarchy:tenant_api_access' %}">{{ api_external_section }}</a>).
         Required for unattended integrations.
       </li>
       <li>
@@ -86,8 +84,13 @@
       </li>
     </ul>
     <p class="d365-help api-guide-note">
-      <code class="d365-code">POST /api/auth/login/</code> itself does not require an API key;
-      it returns a session for browser or staff API use.
+      <code class="d365-code">POST /api/auth/login/</code> requires
+      <code class="d365-code">tenant_id</code>, <code class="d365-code">username</code>, and
+      <code class="d365-code">password</code>. It does not require an inbound API key. When the
+      tenant has an active external API (AD), credentials are checked at the external
+      Internal login uses the local Django password. Sync users calls external
+      <code class="d365-code">GET /api/auth/users</code> with tenant ApiKey only. On success a session is created for
+      the matching local employee.
     </p>
   </section>
 
@@ -101,11 +104,12 @@
         (strings; empty when not set). Full employee GET also returns these at the top level.
       </li>
       <li>
-        <strong>Auth user payloads</strong> —
-        <code class="d365-code">POST /api/auth/login/</code> includes
-        <code class="d365-code">civil_id</code> and <code class="d365-code">employee_number</code>
-        when a linked employee exists.
-        <code class="d365-code">POST /api/auth/users/</code> returns both fields on create (often empty until edited).
+        <strong>Login payload</strong> —
+        <code class="d365-code">POST /api/auth/login/</code> returns
+        <code class="d365-code">auth</code> (whether external AD and internal steps succeeded),
+        plus <code class="d365-code">employee</code> and <code class="d365-code">signatures</code>
+        (same as <code class="d365-code">GET /api/employees/</code>). Errors include
+        <code class="d365-code">auth</code> so clients can see which step failed.
       </li>
       <li>
         <strong>Versioned GET (<code class="d365-code">/api/v1/…</code>)</strong> — Successful reads include

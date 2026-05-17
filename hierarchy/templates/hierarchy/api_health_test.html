@@ -7,7 +7,8 @@
 <div class="d365-card d365-card--wide">
   <h1>{% trans "External API health" %}</h1>
   <p class="d365-card__subtitle">
-    Server-side GET from this app to <code class="d365-code">/api/health</code> on this tenant’s API base when configured; otherwise the global fallback URL from settings.
+    {{ api_external_lead }}
+    Server-side GET to <code class="d365-code">/api/health</code> on the tenant’s external API (AD) base URL, or the global fallback from settings.
   </p>
 
   {% if user.is_superuser and tenant_choices %}
@@ -26,7 +27,15 @@
   {% endif %}
 
   {% if probe_tenant %}
-    <p class="d365-help" style="margin-bottom: 12px;">Probing tenant <strong>{{ probe_tenant.name }}</strong>{% if not probe_tenant.api_base_url %} (no API base URL — using global fallback){% endif %}.</p>
+    <p class="d365-help" style="margin-bottom: 12px;">
+      {% trans "Probing tenant" %} <strong>{{ probe_tenant.name }}</strong>
+      {% if not probe_tenant.api_base_url %}
+        ({% trans "no external API URL — using global fallback" %}.
+        <a href="{% url 'hierarchy:tenant_api_access_for' probe_tenant.pk %}">{% trans "Configure external API" %}</a>)
+      {% else %}
+        · <a href="{% url 'hierarchy:tenant_api_access_for' probe_tenant.pk %}">{{ api_external_section }}</a>
+      {% endif %}
+    </p>
   {% endif %}
 
   <div class="d365-health-meta">

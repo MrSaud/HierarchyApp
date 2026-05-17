@@ -259,14 +259,13 @@ class EmployeeProfileForm(forms.ModelForm):
 
 
 class TenantForm(forms.ModelForm):
-    """Create or edit a tenant (slug optional on create — generated from name)."""
+    """Create or edit tenant organization fields (name, slug, active)."""
 
     class Meta:
         model = Tenant
-        fields = ("name", "slug", "api_base_url", "is_active")
+        fields = ("name", "slug", "is_active")
         help_texts = {
             "slug": "URL-safe identifier for APIs (e.g. acme-corp). Leave blank to auto-generate from name.",
-            "api_base_url": "Tenant-specific API host (scheme + host + port). Example: http://63.183.213.237:1113",
         }
 
     def __init__(self, *args, **kwargs):
@@ -275,8 +274,7 @@ class TenantForm(forms.ModelForm):
         self.fields["name"].widget.attrs.setdefault("class", inp)
         self.fields["slug"].widget.attrs.setdefault("class", inp)
         self.fields["slug"].required = False
-        self.fields["api_base_url"].widget.attrs.setdefault("class", inp)
-        self.fields["api_base_url"].required = False
+        self.fields["is_active"].widget.attrs.setdefault("class", "d365-checkbox")
 
     def clean(self):
         from django.utils.text import slugify
@@ -312,20 +310,80 @@ class TenantForm(forms.ModelForm):
         return cleaned
 
 
-class TenantApiHeaderForm(forms.Form):
-    """HTTP header name for this tenant's API key (default X-Api-Key)."""
+class TenantExternalApiForm(forms.ModelForm):
+    """External AD API connection for a tenant (base URL, ApiKey, header name)."""
 
-    api_key_header = forms.CharField(
-        max_length=64,
+    api_key = forms.CharField(
         required=False,
-        label="API key header",
-        help_text="Leave blank to use X-Api-Key.",
+        label="ApiKey",
+        widget=forms.PasswordInput(
+            render_value=False,
+            attrs={
+                "class": "d365-input",
+                "autocomplete": "new-password",
+                "placeholder": "Paste a key or use Generate below",
+            },
+        ),
+        help_text="Secret Hierarchy sends to the AD server on outbound calls (sync, health, and login when AD login is on).",
+    )
+    clear_api_key = forms.BooleanField(
+        required=False,
+        label="Revoke ApiKey",
+        help_text="Remove the stored key (health checks, sync, and AD login will fail until a new key is set).",
     )
 
-    def __init__(self, *args, initial_header: str = "", **kwargs):
+    class Meta:
+        model = Tenant
+        fields = ("api_base_url", "api_key_header", "external_login_enabled")
+        labels = {
+            "api_base_url": "External API (AD) base URL",
+            "api_key_header": "ApiKeyHeader",
+            "external_login_enabled": "Use AD for login",
+        }
+        help_texts = {
+            "api_base_url": "Directory server URL. Example: http://63.183.213.237:1113",
+            "api_key_header": "HTTP header for ApiKey on AD requests; defaults to X-Api-Key if blank.",
+            "external_login_enabled": (
+                "When enabled, API login checks username/password with AD. "
+                "When disabled, login uses local Django passwords only."
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["api_key_header"].initial = initial_header
-        self.fields["api_key_header"].widget.attrs.setdefault("class", "d365-input")
+        inp = "d365-input"
+        self.fields["api_base_url"].widget.attrs.setdefault("class", inp)
+        self.fields["api_base_url"].required = False
+        self.fields["api_base_url"].widget.attrs.setdefault(
+            "placeholder",
+            "https://ad-api.example.com:1113",
+        )
+        self.fields["api_key_header"].widget.attrs.setdefault("class", inp)
+        self.fields["api_key_header"].required = False
+        self.fields["api_key_header"].widget.attrs.setdefault("placeholder", "X-Api-Key")
+        self.fields["clear_api_key"].widget.attrs.setdefault("class", "d365-checkbox")
+        self.fields["external_login_enabled"].widget.attrs.setdefault("class", "d365-checkbox")
+
+        from .tenant_api_credentials import tenant_outbound_api_key
+
+        if tenant_outbound_api_key(self.instance):
+            self.fields["api_key"].help_text = (
+                (self.fields["api_key"].help_text or "")
+                + " Leave blank to keep the current value."
+            )
+        else:
+            self.fields["api_key"].help_text += " No key is configured yet."
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        new_key = (self.cleaned_data.get("api_key") or "").strip()
+        if self.cleaned_data.get("clear_api_key"):
+            instance.api_key = ""
+        elif new_key:
+            instance.api_key = new_key
+        if commit:
+            instance.save()
+        return instance
 
 
 class SignatureImageMetaForm(forms.ModelForm):

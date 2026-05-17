@@ -60,7 +60,8 @@
               <noscript><button type="submit" class="d365-btn">{% trans "Apply" %}</button></noscript>
             </form>
             {% if active_tenant %}
-            <a href="{% url 'hierarchy:tenant_edit' active_tenant.pk %}" class="d365-link d365-link--compact">{% trans "Tenant settings" %}</a>
+            <a href="{% url 'hierarchy:tenant_edit' active_tenant.pk %}" class="d365-link d365-link--compact">{% trans "Edit tenant" %}</a>
+            <a href="{% url 'hierarchy:tenant_api_access_for' active_tenant.pk %}" class="d365-link d365-link--compact">{{ api_external_section }}</a>
             {% endif %}
             {% endif %}
             {% if user.is_staff and directory_search_enabled %}
@@ -170,7 +171,7 @@
                         <a href="{% url 'hierarchy:tenant_api_access' %}" class="d365-nav-link{% if u == 'tenant_api_access' or u == 'tenant_api_access_for' %} is-active{% endif %}">
                         {% endif %}
                           <span class="d365-nav-link__icon d365-nav-link__icon--health" aria-hidden="true"></span>
-                          <span class="d365-nav-link__text">{% trans "API access" %}</span>
+                          <span class="d365-nav-link__text">{{ api_external_section }}</span>
                         </a>
                       </li>
                       {% endif %}

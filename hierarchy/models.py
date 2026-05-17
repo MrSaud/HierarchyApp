@@ -9,24 +9,45 @@ class Tenant(models.Model):
     slug = models.SlugField(max_length=80, unique=True, db_index=True)
     is_active = models.BooleanField(default=True)
     api_base_url = models.URLField(
-        "API base URL",
+        "External API (AD) base URL",
         max_length=500,
         blank=True,
-        help_text="This tenant's backend base (e.g. http://63.183.213.237:1113). "
-        "Health checks use {base}/api/health.",
+        help_text="External API: AD / Windows Authentication server this tenant uses. "
+        "Scheme + host + port, e.g. http://63.183.213.237:1113. "
+        "Hierarchy calls {base}/api/health and {base}/api/auth/users for sync and login.",
     )
     api_key = models.CharField(
+        "ApiKey",
         max_length=255,
         blank=True,
-        help_text="Shared secret for machine API clients (GET /api/employees/). "
-        "Optional: override in production with env TENANT_API_KEY_<tenant_pk>.",
+        help_text="External API: secret sent to the AD server on outbound calls "
+        "(stored on this tenant; not overridden by env).",
     )
     api_key_header = models.CharField(
+        "ApiKeyHeader",
         max_length=64,
         blank=True,
         default="",
-        help_text="HTTP header for api_key (default X-Api-Key if empty). "
-        "Optional env: TENANT_API_KEY_HEADER_<tenant_pk>.",
+        help_text="External API: HTTP header name for ApiKey on AD requests; "
+        "optional, defaults to X-Api-Key (tenant settings only).",
+    )
+    external_login_enabled = models.BooleanField(
+        "AD login enabled",
+        default=True,
+        help_text="When on, POST /api/auth/login/ verifies credentials against the external AD API. "
+        "When off, login uses local Django passwords only (sync and health still use the external API above).",
+    )
+    external_sync_username = models.CharField(
+        "AD sync username",
+        max_length=255,
+        blank=True,
+        help_text="Service account for Sync users (GET /api/auth/users with JSON body).",
+    )
+    external_sync_password = models.CharField(
+        "AD sync password",
+        max_length=255,
+        blank=True,
+        help_text="Password for the AD sync account (stored on tenant).",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

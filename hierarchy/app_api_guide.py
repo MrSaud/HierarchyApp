@@ -32,24 +32,27 @@ def _example_create_user_response() -> str:
 
 
 def _example_login_response() -> str:
-    return _format_json(
-        {
-            "detail": "Logged in.",
-            "user": {
-                "id": 42,
-                "username": "jdoe",
-                "email": "jdoe@example.com",
-                "is_staff": True,
-                "civil_id": "123456789012",
-                "employee_number": "T2-12345",
-                "tenant": {
-                    "slug": "mosa-kuwait",
-                    "name": "Ministry of Social Affairs — Kuwait",
-                    "apiBaseUrl": "http://63.183.213.237:1113",
-                },
-            },
-        }
-    )
+    profile = json.loads(_example_employee_get_response())
+    profile["detail"] = "Logged in."
+    profile["auth"] = {
+        "tenant_id": 2,
+        "external_api_configured": True,
+        "external_login_enabled": True,
+        "external_api": {
+            "attempted": True,
+            "success": True,
+            "users_url": "http://63.183.213.237:1113/api/auth/users",
+            "error": None,
+        },
+        "internal": {
+            "attempted": True,
+            "success": True,
+            "method": "external_session",
+            "step": "session",
+            "error": None,
+        },
+    }
+    return _format_json(profile)
 
 
 def _example_org_units_flat_response() -> str:
@@ -281,6 +284,33 @@ def _example_assignments_list_response() -> str:
                     "start_date": "2024-01-01",
                     "end_date": None,
                     "notes": "",
+                }
+            ],
+        }
+    )
+
+
+def _example_signatures_response() -> str:
+    return _format_json(
+        {
+            "employee": {
+                "id": 15,
+                "user_id": 42,
+                "username": "jdoe",
+                "civil_id": "123456789012",
+                "employee_number": "T2-12345",
+                "first_name": "Jane",
+                "last_name": "Doe",
+                "name": "Jane Doe",
+            },
+            "signatures": [
+                {
+                    "id": 1,
+                    "label": "Official",
+                    "sort_order": 0,
+                    "mime_type": "image/png",
+                    "filename": "signature.png",
+                    "base64": "<base64-encoded file bytes>",
                 }
             ],
         }
@@ -529,7 +559,9 @@ def hierarchy_app_api_endpoints(site_base: str) -> list[dict[str, Any]]:
             "auth_required": True,
             "note": (
                 "Unversioned response (no ETag). For conditional GET use "
-                "<code class=\"d365-code\">/api/v1/employees/</code>."
+                "<code class=\"d365-code\">/api/v1/employees/</code>. "
+                "Signatures only: "
+                "<code class=\"d365-code\">/api/employees/signatures/</code>."
             ),
         },
         {
@@ -638,6 +670,75 @@ def hierarchy_app_api_endpoints(site_base: str) -> list[dict[str, Any]]:
                 ("4xx Error", error_json),
             ],
             "curl": f'''curl -sS -D- "{base}/api/v1/employees/reports-to/?tenant_id=2&username=jdoe" \\
+  -H "X-Api-Key: <tenant-token>"''',
+            "auth_required": True,
+        },
+        {
+            "id": "employee-signatures",
+            "method": "GET",
+            "path": "/api/employees/signatures/",
+            "url": f"{base}/api/employees/signatures/",
+            "title": "Get employee signatures",
+            "auth_label": "Tenant API key",
+            "summary": (
+                "Return signature images only for one employee: compact "
+                "<code class=\"d365-code\">employee</code> identity plus "
+                "<code class=\"d365-code\">signatures</code> (Base64, same objects as "
+                "<code class=\"d365-code\">GET /api/employees/</code>). "
+                "Query string only."
+            ),
+            "request_fields": [
+                ("tenant_id", "integer", "Yes"),
+                ("user_id / username / civil_id", "query", "Exactly one required"),
+            ],
+            "responses": [
+                ("200", "employee brief + signatures"),
+                ("400", "Bad query"),
+                ("401", "Not authenticated"),
+                ("403", "Access denied"),
+                ("404", "Not found"),
+                ("409", "Multiple civil_id matches"),
+            ],
+            "response_examples": [
+                ("200 OK", _example_signatures_response()),
+                ("4xx Error", error_json),
+            ],
+            "curl": f'''curl -sS "{base}/api/employees/signatures/?tenant_id=2&username=jdoe" \\
+  -H "X-Api-Key: <tenant-token>"''',
+            "auth_required": True,
+        },
+        {
+            "id": "api-v1-employee-signatures",
+            "method": "GET",
+            "path": "/api/v1/employees/signatures/",
+            "url": f"{base}/api/v1/employees/signatures/",
+            "title": "Get employee signatures (v1)",
+            "auth_label": "Tenant API key",
+            "summary": (
+                "Same body as <code class=\"d365-code\">/api/employees/signatures/</code> "
+                "with <code class=\"d365-code\">ETag</code>, "
+                "<code class=\"d365-code\">X-API-Read-Contract: employee-signatures-v1</code>, "
+                "and optional <code class=\"d365-code\">If-None-Match</code>."
+            ),
+            "request_fields": [
+                ("tenant_id", "integer", "Yes"),
+                ("user_id / username / civil_id", "query", "Exactly one required"),
+                ("If-None-Match", "header", "No"),
+            ],
+            "responses": [
+                ("200", "employee brief + signatures"),
+                ("304", "Not modified"),
+                ("400", "Bad query"),
+                ("401", "Not authenticated"),
+                ("403", "Access denied"),
+                ("404", "Not found"),
+                ("409", "Multiple civil_id matches"),
+            ],
+            "response_examples": [
+                ("200 OK", _example_signatures_response()),
+                ("4xx Error", error_json),
+            ],
+            "curl": f'''curl -sS -D- "{base}/api/v1/employees/signatures/?tenant_id=2&username=jdoe" \\
   -H "X-Api-Key: <tenant-token>"''',
             "auth_required": True,
         },
@@ -785,21 +886,34 @@ def hierarchy_app_api_endpoints(site_base: str) -> list[dict[str, Any]]:
             "title": "Login",
             "auth_label": "None",
             "summary": (
-                "Authenticate with JSON; on success sets a session cookie "
-                "(<code class=\"d365-code\">sessionid</code>) usable on other "
-                "tenant-scoped endpoints when logged in as staff. CSRF exempt. "
-                "Response <code class=\"d365-code\">user</code> includes "
-                "<code class=\"d365-code\">civil_id</code> and "
-                "<code class=\"d365-code\">employee_number</code> when an employee row exists."
+                "Authenticate with <code class=\"d365-code\">tenant_id</code>, "
+                "<code class=\"d365-code\">username</code>, and "
+                "<code class=\"d365-code\">password</code>. When <strong>AD login</strong> is "
+                "enabled on the tenant External API page and the external API is configured, "
+                "Hierarchy verifies credentials with "
+                "<code class=\"d365-code\">GET /api/auth/users</code> on the AD server "
+                "(JSON body + tenant ApiKey), then creates a session for the matching local "
+                "employee. With AD login off, uses the local Django password only (sync and "
+                "health still use the external API). Response includes "
+                "<code class=\"d365-code\">auth</code> (see <code class=\"d365-code\">external_login_enabled</code>), "
+                "<code class=\"d365-code\">employee</code>, and "
+                "<code class=\"d365-code\">signatures</code>. CSRF exempt."
             ),
             "request_fields": [
+                ("tenant_id", "integer", "Yes"),
                 ("username", "string", "Yes"),
                 ("password", "string", "Yes"),
             ],
             "responses": [
-                ("200", "Logged in — user includes id, username, email, is_staff, civil_id, employee_number, tenant"),
-                ("401", "Invalid credentials"),
-                ("403", "Account disabled"),
+                (
+                    "200",
+                    "Logged in — <code class=\"d365-code\">auth</code> + "
+                    "<code class=\"d365-code\">employee</code> + "
+                    "<code class=\"d365-code\">signatures</code>",
+                ),
+                ("401", "External or local credentials rejected; see <code class=\"d365-code\">auth</code>"),
+                ("403", "Disabled account or missing employee; see <code class=\"d365-code\">auth</code>"),
+                ("503", "External AD unreachable; <code class=\"d365-code\">auth.external_api</code> has error"),
             ],
             "response_examples": [
                 ("200 OK", _example_login_response()),
@@ -807,7 +921,7 @@ def hierarchy_app_api_endpoints(site_base: str) -> list[dict[str, Any]]:
             ],
             "curl": f'''curl -sS -c cookies.txt -X POST "{base}/api/auth/login/" \\
   -H "Content-Type: application/json" \\
-  -d '{{"username":"jdoe","password":"SecurePass1!"}}' ''',
+  -d '{{"tenant_id":1,"username":"jdoe","password":"SecurePass1!"}}' ''',
             "auth_required": False,
         },
     ]

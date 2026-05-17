@@ -33,16 +33,18 @@ from .forms import (
     EmployeeUserCreationForm,
     EmployeeUserEditForm,
     SignatureImageMetaForm,
-    TenantApiHeaderForm,
+    TenantExternalApiForm,
     TenantForm,
     MAX_SIGNATURE_IMAGES,
 )
 from .tenant_api_credentials import (
-    effective_tenant_api_key,
-    effective_tenant_api_key_header,
+    mask_api_key_preview,
+    tenant_outbound_api_key,
+    tenant_outbound_api_key_header,
 )
 from .user_tenant import get_user_tenant, get_user_tenant_id
 from .remote_users import (
+    tenant_external_api_configured,
     RemoteUserSyncError,
     build_users_list_url,
     extract_user_rows,
@@ -251,7 +253,10 @@ def tenant_create(request):
     return render(
         request,
         "hierarchy/tenant_create.html",
-        {"form": form},
+        {
+            "form": form,
+            "hierarchy_api_base": request.build_absolute_uri("/").rstrip("/"),
+        },
     )
 
 
@@ -315,7 +320,7 @@ def _tenant_api_token_session_key(tenant_pk: int) -> str:
 
 @login_required
 def tenant_api_access(request, pk=None):
-    """Staff: generate or revoke this tenant's API token for machine clients."""
+    """Staff: configure external AD API (base URL, ApiKey, header) for this tenant."""
     if not request.user.is_staff:
         raise PermissionDenied
 
@@ -342,38 +347,45 @@ def tenant_api_access(request, pk=None):
             request.session[flash_key] = token
             messages.success(
                 request,
-                "New API token generated. Copy it below — it will not be shown again.",
+                "New ApiKey generated. Copy it below — it will not be shown again.",
             )
         elif action == "revoke":
             tenant.api_key = ""
             tenant.save(update_fields=["api_key"])
             request.session.pop(flash_key, None)
-            messages.success(request, "API token revoked.")
-        elif action == "header":
-            form = TenantApiHeaderForm(request.POST)
+            messages.success(request, "ApiKey revoked.")
+        elif action == "save":
+            form = TenantExternalApiForm(request.POST, instance=tenant)
             if form.is_valid():
-                tenant.api_key_header = form.cleaned_data["api_key_header"] or ""
-                tenant.save(update_fields=["api_key_header"])
-                messages.success(request, "API key header name saved.")
+                form.save()
+                messages.success(request, "External API settings saved.")
         if pk is not None:
             return redirect("hierarchy:tenant_api_access_for", pk=tenant.pk)
         return redirect("hierarchy:tenant_api_access")
 
     new_token = request.session.pop(flash_key, None)
-    header_name = effective_tenant_api_key_header(tenant)
-    has_key = bool(effective_tenant_api_key(tenant))
+    external_form = TenantExternalApiForm(instance=tenant)
+    header_name = tenant_outbound_api_key_header(tenant)
+    outbound_key = tenant_outbound_api_key(tenant)
+    has_key = bool(outbound_key)
+    api_key_preview = mask_api_key_preview(outbound_key) if has_key else ""
     site_base = request.build_absolute_uri("/").rstrip("/")
-    header_form = TenantApiHeaderForm(initial_header=tenant.api_key_header or "")
+    ad_base = (tenant.api_base_url or "").strip().rstrip("/")
+    external_configured = tenant_external_api_configured(tenant)
 
     return render(
         request,
         "hierarchy/tenant_api_access.html",
         {
             "tenant": tenant,
+            "external_form": external_form,
             "new_token": new_token,
             "has_api_key": has_key,
+            "api_key_preview": api_key_preview,
             "api_key_header": header_name,
-            "header_form": header_form,
+            "ad_base_url": ad_base,
+            "external_api_configured": external_configured,
+            "external_login_enabled": tenant.external_login_enabled,
             "site_api_base": site_base,
             "can_manage_tenant_record": request.user.is_superuser,
         },
@@ -395,10 +407,14 @@ def tenant_edit(request, pk):
             return redirect("hierarchy:tenant_list")
     else:
         form = TenantForm(instance=tenant)
+
     return render(
         request,
         "hierarchy/tenant_edit.html",
-        {"form": form, "tenant": tenant},
+        {
+            "form": form,
+            "tenant": tenant,
+        },
     )
 
 
@@ -853,8 +869,8 @@ def _user_sync_prepare(request):
     """Parse sync form/query params shared by the HTML page and streaming endpoint."""
     search_q = (request.POST.get("search") if request.method == "POST" else request.GET.get("search")) or ""
     search_q = search_q.strip()
-    username_q = (request.POST.get("username") if request.method == "POST" else request.GET.get("username")) or ""
-    username_q = username_q.strip()
+    container_q = (request.POST.get("container") if request.method == "POST" else request.GET.get("container")) or ""
+    container_q = container_q.strip()
     take_raw = (request.POST.get("take") if request.method == "POST" else request.GET.get("take")) or "100"
     try:
         take_int = max(1, min(500, int(str(take_raw).strip())))
@@ -868,6 +884,10 @@ def _user_sync_prepare(request):
             or ""
         ).strip()
 
+    only_new = False
+    if request.method == "POST":
+        only_new = request.POST.get("only_new") in ("1", "on", "true", "yes")
+
     sync_tenant = _tenant_for_remote_sync(request)
 
     base = ""
@@ -879,14 +899,15 @@ def _user_sync_prepare(request):
                 base,
                 search=search_q or None,
                 take=take_int,
-                username=username_q or None,
+                container=container_q or None,
             )
 
     return {
         "search_q": search_q,
-        "username_q": username_q,
+        "container_q": container_q,
         "take_int": take_int,
         "tenant_slug_q": tenant_slug_q,
+        "only_new": only_new,
         "sync_tenant": sync_tenant,
         "base": base,
         "request_url": request_url,
@@ -908,19 +929,17 @@ def user_sync(request):
 
     prep = _user_sync_prepare(request)
     sync_tenant = prep["sync_tenant"]
-    search_q = prep["search_q"]
-    username_q = prep["username_q"]
-    take_int = prep["take_int"]
     tenant_slug_q = prep["tenant_slug_q"]
     request_url = prep["request_url"]
     base = prep["base"]
 
     context = {
         "sync_tenant": sync_tenant,
-        "search_q": search_q,
-        "username_q": username_q,
-        "take_q": str(take_int),
+        "search_q": prep["search_q"],
+        "container_q": prep["container_q"],
+        "take_q": str(prep["take_int"]),
         "tenant_slug_q": tenant_slug_q,
+        "only_new": prep["only_new"],
         "tenant_choices": Tenant.objects.filter(is_active=True).order_by("name")
         if request.user.is_superuser
         else [],
@@ -939,7 +958,7 @@ def user_sync(request):
     if not base:
         messages.error(
             request,
-            "No API base URL: set the tenant's API base URL or configure EXTERNAL_API_HEALTH_URL.",
+            "No external API (AD) URL: set External API base URL on the tenant or configure EXTERNAL_API_HEALTH_URL.",
         )
         return render(request, "hierarchy/user_sync.html", context)
 
@@ -949,21 +968,23 @@ def user_sync(request):
     try:
         payload = fetch_remote_users_json(request_url, tenant=sync_tenant)
         rows = extract_user_rows(payload)
-        stats = sync_users_for_tenant(sync_tenant, rows)
+        stats = sync_users_for_tenant(sync_tenant, rows, only_new=prep["only_new"])
         context["last_stats"] = stats
         context["last_row_count"] = len(rows)
         record_audit(
             "remote_user_sync",
-            "mode=post tenant_id=%s slug=%s remote_rows=%s created=%s updated=%s skipped=%s "
-            "tenant_linked=%s employees_created=%s employees_updated=%s managers_linked=%s "
-            "error_count=%s"
+            "mode=post tenant_id=%s slug=%s only_new=%s remote_rows=%s created=%s updated=%s "
+            "skipped=%s skipped_existing=%s tenant_linked=%s employees_created=%s "
+            "employees_updated=%s managers_linked=%s error_count=%s"
             % (
                 sync_tenant.pk,
                 sync_tenant.slug,
+                prep["only_new"],
                 len(rows),
                 stats.created,
                 stats.updated,
                 stats.skipped,
+                stats.skipped_existing,
                 stats.tenant_linked,
                 stats.employees_created,
                 stats.employees_updated,
@@ -975,7 +996,8 @@ def user_sync(request):
         messages.success(
             request,
             f"Synced {len(rows)} remote row(s): {stats.created} users created, "
-            f"{stats.updated} updated, {stats.skipped} rows skipped (no username); "
+            f"{stats.updated} updated, {stats.skipped} rows skipped (no username), "
+            f"{stats.skipped_existing} skipped (already in app); "
             f"{stats.tenant_linked} employee tenant link(s) ensured; "
             f"{stats.employees_created} employee profile(s) created; "
             f"{stats.employees_updated} employee profile(s) updated from remote fields; "
@@ -1019,7 +1041,7 @@ def user_sync_stream(request):
     if not base:
         return JsonResponse(
             {
-                "detail": "No API base URL: set the tenant's API base URL or "
+                "detail": "No external API (AD) URL: set External API base URL on the tenant or "
                 "configure EXTERNAL_API_HEALTH_URL.",
             },
             status=400,
@@ -1053,7 +1075,8 @@ def user_sync_stream(request):
             {"phase": "fetch_done", "pct": 5, "total": n, "label": "Processing rows…"}
         )
 
-        for ev in sync_users_for_tenant_events(sync_tenant, rows):
+        only_new = prep["only_new"]
+        for ev in sync_users_for_tenant_events(sync_tenant, rows, only_new=only_new):
             if ev["phase"] == "row":
                 yield _sync_ndjson_line(ev)
             elif ev["phase"] == "managers":
@@ -1062,16 +1085,18 @@ def user_sync_stream(request):
                 st = ev["stats"]
                 record_audit(
                     "remote_user_sync",
-                    "mode=stream tenant_id=%s slug=%s remote_rows=%s created=%s updated=%s skipped=%s "
-                    "tenant_linked=%s employees_created=%s employees_updated=%s managers_linked=%s "
-                    "error_count=%s"
+                    "mode=stream tenant_id=%s slug=%s only_new=%s remote_rows=%s created=%s "
+                    "updated=%s skipped=%s skipped_existing=%s tenant_linked=%s "
+                    "employees_created=%s employees_updated=%s managers_linked=%s error_count=%s"
                     % (
                         sync_tenant.pk,
                         sync_tenant.slug,
+                        only_new,
                         ev["row_count"],
                         st.created,
                         st.updated,
                         st.skipped,
+                        st.skipped_existing,
                         st.tenant_linked,
                         st.employees_created,
                         st.employees_updated,

@@ -1,4 +1,4 @@
-"""Inbound API authentication (per-tenant API keys + optional global Bearer)."""
+"""Inbound authentication for the internal API (per-tenant ApiKey + optional global Bearer)."""
 
 from __future__ import annotations
 

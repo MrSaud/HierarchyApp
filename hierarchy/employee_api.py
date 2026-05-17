@@ -210,6 +210,59 @@ def _serialize_employee(emp: Employee) -> dict:
     }
 
 
+def employee_detail_queryset():
+    """Queryset with relations needed for ``build_employee_api_payload``."""
+    return (
+        Employee.objects.select_related("user", "tenant")
+        .prefetch_related(
+            "signatures",
+            Prefetch(
+                "position_assignments",
+                queryset=PositionAssignment.objects.select_related(
+                    "position__organizational_unit__parent",
+                ).order_by("-is_primary", "-start_date", "pk"),
+            ),
+            Prefetch(
+                "delegations_given",
+                queryset=Delegation.objects.select_related(
+                    "delegatee__user",
+                    "delegator__user",
+                    "template",
+                ).order_by("-start_date", "pk"),
+            ),
+            Prefetch(
+                "delegations_received",
+                queryset=Delegation.objects.select_related(
+                    "delegator__user",
+                    "delegatee__user",
+                    "template",
+                ).order_by("-start_date", "pk"),
+            ),
+        )
+    )
+
+
+def signatures_for_employee(emp: Employee) -> list[dict]:
+    qs = emp.signatures.order_by("sort_order", "pk")
+    return [_serialize_signature(s) for s in qs]
+
+
+def build_employee_signatures_payload(emp: Employee) -> dict:
+    """Same signature list as employee GET, with a compact ``employee`` header."""
+    return {
+        "employee": _serialize_employee_brief(emp),
+        "signatures": signatures_for_employee(emp),
+    }
+
+
+def build_employee_api_payload(emp: Employee) -> dict:
+    """Same JSON shape as ``GET /api/employees/`` (200)."""
+    return {
+        "employee": _serialize_employee(emp),
+        "signatures": signatures_for_employee(emp),
+    }
+
+
 def employee_resolve_from_get(request) -> tuple[Employee | None, JsonResponse | None]:
     """
     Shared tenant + identity lookup for directory-style GET APIs.
@@ -327,43 +380,9 @@ def employee_get_payload_dict(request) -> tuple[dict | None, JsonResponse | None
     if err is not None:
         return None, err
 
-    qs = (
-        Employee.objects.filter(pk=emp.pk)
-        .select_related("user", "tenant")
-        .prefetch_related(
-            "signatures",
-            Prefetch(
-                "position_assignments",
-                queryset=PositionAssignment.objects.select_related(
-                    "position__organizational_unit__parent",
-                ).order_by("-is_primary", "-start_date", "pk"),
-            ),
-            Prefetch(
-                "delegations_given",
-                queryset=Delegation.objects.select_related(
-                    "delegatee__user",
-                    "delegator__user",
-                    "template",
-                ).order_by("-start_date", "pk"),
-            ),
-            Prefetch(
-                "delegations_received",
-                queryset=Delegation.objects.select_related(
-                    "delegator__user",
-                    "delegatee__user",
-                    "template",
-                ).order_by("-start_date", "pk"),
-            ),
-        )
-    )
-    emp = qs.first()
+    emp = employee_detail_queryset().filter(pk=emp.pk).first()
     assert emp is not None
-
-    signatures = [_serialize_signature(s) for s in emp.signatures.all()]
-    return {
-        "employee": _serialize_employee(emp),
-        "signatures": signatures,
-    }, None
+    return build_employee_api_payload(emp), None
 
 
 @require_http_methods(["GET", "OPTIONS"])

@@ -47,7 +47,17 @@ class TenantAdmin(admin.ModelAdmin):
     search_fields = ("name", "slug")
     fieldsets = (
         (None, {"fields": ("name", "slug", "is_active")}),
-        ("API integration", {"fields": ("api_base_url", "api_key", "api_key_header")}),
+        (
+            "External API (AD)",
+            {
+                "fields": (
+                    "api_base_url",
+                    "api_key",
+                    "api_key_header",
+                    "external_login_enabled",
+                ),
+            },
+        ),
     )
 
 
